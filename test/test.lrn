@@ -1,0 +1,22 @@
+
+# DEB пакеты (Debian, Ubuntu и тому подобное)
+%dpkg
+@ example
+ given programm:
+ main() {
+ 	return 0;
+ }
+
+^ install
+> {{example}}
+установить / обновить пакет pack.deb (d)
+< dpkg -i pack.deb
+
+%eng
+^ greetings
+> {{example}}
+  -Как дела?
+	-Хорошо
+< -How are you?
+# DEB пакеты (Debian, Ubuntu и тому подобное)
+	-Fine
