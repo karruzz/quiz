@@ -15,7 +15,7 @@ public:
 			const boost::filesystem::path &path,
 			std::map<std::string, std::vector<std::string> > params);
 
-	static void save_stat(
+	static void save_statistic(
 			const std::vector<Problem> &problems,
 			const boost::filesystem::path &path);
 

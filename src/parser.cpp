@@ -151,7 +151,7 @@ std::map<std::string, Statistic> load_stat(const boost::filesystem::path &lrn_fi
 	return result;
 }
 
-void Parser::save_stat(const std::vector<Problem> &problems, const boost::filesystem::path &path)
+void Parser::save_statistic(const std::vector<Problem> &problems, const boost::filesystem::path &path)
 {
 	boost::filesystem::path stat_path = "." + path.stem().string() + ".stat";
 	stat_path = path.parent_path() / stat_path;
