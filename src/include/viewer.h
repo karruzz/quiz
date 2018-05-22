@@ -9,9 +9,9 @@
 namespace view {
 
 struct Statistic {
-	int test_total_problems;
-	int test_left_problems;
-	int test_errors;
+	int total_problems;
+	int left_problems;
+	int errors;
 
 	int problem_repeat_times;
 	int problem_errors;

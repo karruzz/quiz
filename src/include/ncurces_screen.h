@@ -9,15 +9,25 @@
 
 namespace view {
 
-class NcusrcesScreen : public Screen
+class NcursesScreen : public Screen
 {
+	enum color {
+		RED = 1,
+		GREEN = 2,
+		YELLOW = 3,
+		BLUE = 4,
+		MAGENTA = 5,
+		CYAN = 6,
+		RED_BKGR = 7
+	};
+
 	struct Geometry {
 		int x, y, w, h;
 	};
 
 public:
-	NcusrcesScreen(bool show_right_answer);
-	virtual ~NcusrcesScreen();
+	NcursesScreen(bool show_right_answer);
+	virtual ~NcursesScreen();
 
 	virtual void update_statistic(const Statistic &s);
 	virtual void show_question(const std::list<std::string> &question);

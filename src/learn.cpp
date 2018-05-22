@@ -29,17 +29,6 @@
 #define SHOW_TAGS        "-s"  // show all tags
 #define LEARN_LAST_ERROR "-e"
 
-//static
-//void cout_stat(int total, int left, int mistakes, int repeat, int errors, int total_errors) {
-//	view::Viewer::colored_line_output("Total:[" + std::to_string(total) + "];", view::Viewer::color::GREEN, false);
-//	view::Viewer::colored_line_output(" Left:[" + std::to_string(left) + "];", view::Viewer::color::CYAN, false);
-//	view::Viewer::colored_line_output(" Mistakes:[" + std::to_string(mistakes) + "]                ", view::Viewer::color::RED, false);
-//	view::Viewer::colored_line_output(" Repeat:[" + std::to_string(repeat) + "];", view::Viewer::color::YELLOW, false);
-//	view::Viewer::colored_line_output(" Errors:[" + std::to_string(errors) + "];", view::Viewer::color::BLUE, false);
-//	view::Viewer::colored_line_output(" Total errors:[" + std::to_string(total_errors) + "]", view::Viewer::color::MAGNETTA);
-//	std::cout << std::endl;
-//}
-
 int main(int argc, char* argv[])
 {
 	if (argc < 2) {
@@ -99,6 +88,8 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
+	setlocale(LC_ALL, "");
+
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
 	std::mt19937 generator(rd()); //Standard mersenne_twister_engine seeded with rd()
 
@@ -112,7 +103,7 @@ int main(int argc, char* argv[])
 		to_solve.push_back(static_cast<int>(i));
 	}
 
-	std::unique_ptr<view::Screen> screen(new view::NcusrcesScreen(show_right_answer));
+	std::unique_ptr<view::Screen> screen(new view::NcursesScreen(show_right_answer));
 
 	int problems_total = to_solve.size(), problems_left;
 	while ((problems_left = to_solve.size()) != 0) {

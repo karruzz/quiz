@@ -2,10 +2,7 @@
 # DEB пакеты (Debian, Ubuntu и тому подобное)
 %dpkg
 @ example
- given programm:
- main() {
- 	return 0;
- }
+ [repeated text]
 
 ^ install
 > {{example}}

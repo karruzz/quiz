@@ -5,18 +5,20 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <cstring>
 
 namespace view {
 
 static
-int mvwaddstr_colored(WINDOW *win, int y, int x, const char *str, int color_scheme) {
-	wattron(win, COLOR_PAIR(color_scheme));
-	int result = mvwaddstr(win, y, x, str);
-	wattroff(win, COLOR_PAIR(color_scheme));
+int waddstr_colored(WINDOW *w, const std::string &s, int color_scheme)
+{
+	wattron(w, COLOR_PAIR(color_scheme));
+	int result = waddstr(w, s.c_str());
+	wattroff(w, COLOR_PAIR(color_scheme));
 	return result;
 }
 
-WINDOW *NcusrcesScreen::create_win(int h, int w, int y, int x)
+WINDOW *NcursesScreen::create_win(int h, int w, int y, int x)
 {
 	WINDOW *win = newwin(h, w, y, x);
 	clear_win(win);
@@ -24,7 +26,7 @@ WINDOW *NcusrcesScreen::create_win(int h, int w, int y, int x)
 	return win;
 }
 
-void NcusrcesScreen::clear_win(WINDOW *win)
+void NcursesScreen::clear_win(WINDOW *win)
 {
 	const Geometry &g = wins[win];
 	wclear(win);
@@ -36,15 +38,17 @@ void NcusrcesScreen::clear_win(WINDOW *win)
 	wrefresh(win);
 }
 
-void NcusrcesScreen::state_print(const std::string &s)
+void NcursesScreen::state_print(const std::string &s)
 {
 	clear_win(win_state);
 	wmove(win_state, 0, 0);
-	waddstr(win_state, s.c_str());
+	waddstr_colored(win_state, s.c_str(), MAGENTA);
 	wrefresh(win_state);
 }
 
-NcusrcesScreen::NcusrcesScreen(bool show_right_answer) :
+#define COLOR_PAIR_INIT(value) init_pair(color::value, COLOR_##value, COLOR_BLACK)
+
+NcursesScreen::NcursesScreen(bool show_right_answer) :
 	show_right_answer(show_right_answer)
 {
 	initscr();
@@ -64,13 +68,19 @@ NcusrcesScreen::NcusrcesScreen(bool show_right_answer) :
 	win_state     = create_win(state_h, COLS - 1, stat_h + ques_h + answ_h + resl_h, 0);
 
 	keypad(win_answer, TRUE);
-	init_pair(1, COLOR_WHITE, COLOR_RED);
-	init_pair(2, COLOR_MAGENTA, COLOR_BLACK);
 
-	state_print(" F2 - check answer       F3 - skip question       ESC - exit");
+	COLOR_PAIR_INIT(RED);
+	COLOR_PAIR_INIT(GREEN);
+	COLOR_PAIR_INIT(YELLOW);
+	COLOR_PAIR_INIT(BLUE);
+	COLOR_PAIR_INIT(MAGENTA);
+	COLOR_PAIR_INIT(CYAN);
+	init_pair(color::RED_BKGR, COLOR_WHITE, COLOR_RED);
+
+	state_print(" F2 - check answer       F3 - skip question       F10 - exit");
 }
 
-NcusrcesScreen::~NcusrcesScreen()
+NcursesScreen::~NcursesScreen()
 {
 	delwin(win_statistic);
 	delwin(win_question);
@@ -80,26 +90,26 @@ NcusrcesScreen::~NcusrcesScreen()
 	endwin();
 }
 
-void NcusrcesScreen::update_statistic(const Statistic &s)
+void NcursesScreen::update_statistic(const Statistic &s)
 {
-	auto cout_stat = [&](const std::string &s) { return waddstr(win_statistic, s.c_str()); };
+	WINDOW *w = win_statistic;
+	clear_win(w);
 
-	clear_win(win_statistic);
+	wmove(w, 0, 1);
+	waddstr_colored(w, "Total:[" + std::to_string(s.total_problems) + "];", GREEN);
+	waddstr_colored(w, " Left:[" + std::to_string(s.left_problems) + "];", CYAN);
+	waddstr_colored(w, " Errors:[" + std::to_string(s.errors) + "]", RED);
 
-	wmove(win_statistic, 0, 1);
-	cout_stat("ALL: Total:[" + std::to_string(s.test_total_problems) + "];");
-	cout_stat(" Left:[" + std::to_string(s.test_left_problems) + "];");
-	cout_stat(" Errors:[" + std::to_string(s.test_errors) + "]");
+	wmove(w, 0, 43);
+	waddstr(w, "PROBLEM:");
+	waddstr_colored(w, " Repeat:[" + std::to_string(s.problem_repeat_times) + "];", YELLOW);
+	waddstr_colored(w, " Errors:[" + std::to_string(s.problem_errors) + "];", BLUE);
+	waddstr_colored(w, " Total errors:[" + std::to_string(s.problem_total_errors) + "]", MAGENTA);
 
-	wmove(win_statistic, 0, 43);
-	cout_stat("PROBLEM: Repeat:[" + std::to_string(s.problem_repeat_times) + "];");
-	cout_stat(" Errors:[" + std::to_string(s.problem_errors) + "];");
-	cout_stat(" Total errors:[" + std::to_string(s.problem_total_errors) + "]");
-
-	wrefresh(win_statistic);
+	wrefresh(w);
 }
 
-void NcusrcesScreen::show_question(const std::list<std::string> &question)
+void NcursesScreen::show_question(const std::list<std::string> &question)
 {
 	int y = 0;
 	clear_win(win_question);
@@ -111,111 +121,204 @@ void NcusrcesScreen::show_question(const std::list<std::string> &question)
 	wrefresh(win_result);
 }
 
-struct Navigator {
-	Navigator() :
-		pos_x(0), pos_y(0), lines_total(1)
+class Navigator
+{
+	std::list<std::string> lines;
+	std::list<std::string>::iterator line;
+
+	// position every symbol on screen, need to handle tabs
+	std::list<std::vector<size_t>> positions;
+	std::list<std::vector<size_t>>::iterator position;
+
+	size_t x, y, lines_total;
+	int tab_size;
+
+	void put_cursor_inside_line()
+	{
+		size_t line_end = line->size();
+		if (x > line_end) x = line_end;
+	}
+
+	void update_positions(int index)
+	{
+		std::vector<size_t> &pos = *position;
+		std::string str = *line;
+
+		if (pos.size() < str.size()) pos.resize(str.size());
+
+		size_t x_prev = (index > 0) ? pos[index - 1] : 0;
+		for (size_t i = index; i < str.size(); ++i)
+			if (str[i] != '\t') {
+				pos[i] = ++x_prev;
+			} else {
+				size_t next = x_prev + tab_size;
+				x_prev = next - next % tab_size;
+				pos[i] = x_prev;
+			}
+
+		if (pos.size() > str.size()) pos.resize(str.size());
+	}
+
+public:
+	Navigator(int tab_size) :
+		x(0), y(0), lines_total(1), tab_size(tab_size)
 	{
 		lines = std::list<std::string>(lines_total);
 		line = lines.begin();
+		positions = std::list<std::vector<size_t>>(lines_total);
+		position = positions.begin();
 	}
 
-	bool backspace() {
-		if (pos_x == 0) return false;
+	void backspace() {
+		if (x != 0) {
+			line->erase(--x, 1);
+		} else {
+			if (line == lines.begin()) return;
+			std::string subst = *line;
+			line = std::prev(lines.erase(line));
+			position = std::prev(positions.erase(position));
 
-		line->erase(--pos_x, 1);
-		return true;
+			--y;
+			x = line->size();
+			line->append(subst);
+			--lines_total;
+		}
+
+		update_positions(x);
 	}
 
-	bool del() {
-		if (line->size() == 0 || pos_x == line->size()) return false;
+	void del() {
+		if (x != line->size()) {
+			line->erase(x, 1);
+		} else {
+			if (line == std::prev(lines.end())) return;
+			auto next = std::next(line);
+			std::string subst = *next;
+			lines.erase(next);
+			positions.erase(std::next(position));
+			line->append(subst);
+			--lines_total;
+		}
 
-		line->erase(pos_x, 1);
-		return true;
+		update_positions(x);
 	}
 
-	void right() {
-		if (pos_x < line->size()) ++pos_x;
+	void home() { x = 0; }
+
+	void end() { x = line->size(); }
+
+	void pg_up() {
+		line = lines.begin();
+		position = positions.begin();
+		y = 0;
+		put_cursor_inside_line();
 	}
 
-	void left() {
-		if (pos_x > 0) --pos_x;
+	void pg_down() {
+		line = std::prev(lines.end());
+		position = std::prev(positions.end());
+		y = lines_total - 1;
+		put_cursor_inside_line();
 	}
+
+	void right() { if (x < line->size()) ++x; }
+
+	void left() { if (x > 0) --x; }
 
 	void up() {
 		if (line == lines.begin()) return;
 
-		--pos_y;
+		--y;
 		--line;
-		size_t line_end = line->size();
-		if (pos_x > line_end) pos_x = line_end;
+		--position;
+		put_cursor_inside_line();
 	}
 
 	void down() {
-		if (line == --lines.end()) return;
+		if (line == std::prev(lines.end())) return;
 
-		++pos_y;
+		++y;
 		++line;
-		size_t line_end = line->size();
-		if (pos_x > line_end) pos_x = line_end;
+		++position;
+		put_cursor_inside_line();
 	}
 
-	std::string new_line() {
-		std::string subst = line->substr(pos_x, line->size() - pos_x);
-		line->erase(pos_x, line->size() - pos_x);
-		line = lines.insert(++line, subst.c_str());
+	void new_line() {
+		std::string subst = line->substr(x, line->size() - x);
+		line->erase(x, line->size() - x);
+		update_positions(0);
+
+		++line;
+		line = lines.insert(line, subst.c_str());
+		++position;
+		position = positions.insert(position, std::vector<size_t>());
+		update_positions(0);
+
 		++lines_total;
-
-		pos_x = 0;
-		++pos_y;
-
-		return subst;
+		++y;
+		x = 0;
 	}
 
 	void add_ch(char ch) {
-		line->insert(pos_x++, 1, ch);
+		line->insert(x, 1, ch);
+		update_positions(x);
+		++x;
 	}
 
 	const std::list<std::string> &get_lines() { return lines; }
-	size_t get_x() { return pos_x; }
-	size_t get_y() { return pos_y; }
-
-private:
-	std::list<std::string> lines;
-	std::list<std::string>::iterator line;
-	size_t pos_x = 0, pos_y = 0, lines_total = 1;
+	const std::string &get_current_line() { return *line; }
+	size_t get_x() { return x > 0 ? (*position)[x - 1] : 0; }
+	size_t get_y() { return y; }
 };
 
-std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcusrcesScreen::get_answer()
+std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answer()
 {
-	Navigator navigator;
+	Navigator navigator(8);
+	WINDOW *w = win_answer;
 
-	clear_win(win_answer);
-	wmove(win_answer, 0, 0);
-	wrefresh(win_answer);
+	auto update_screen = [&] () {
+		int y = 0;
+		clear_win(w);
+		for (const std::string s: navigator.get_lines())
+			mvwaddstr(w, y++, 0, s.c_str());
+	};
 
-	size_t y = 0;
+	clear_win(w);
+	wmove(w, 0, 0);
+	wrefresh(w);
+
 	for (;;) {
-		int ch = wgetch(win_answer);
+		int ch = wgetch(w);
 
 		if (ch == ERR) {
 			throw std::runtime_error("wgetch error");
 		} else if (ch == KEY_F(2)) { // finish answer
 			return std::make_tuple(Screen::INPUT_STATE::ENTERED, navigator.get_lines());
 		} else if (ch == KEY_F(3)) { // skip question
-			return std::make_tuple(Screen::INPUT_STATE::SKIPPED, navigator.get_lines());
-		} else if (ch == 27) { // key esc, exit
-			return std::make_tuple(Screen::INPUT_STATE::EXIT, navigator.get_lines());
+			return std::make_tuple(Screen::INPUT_STATE::SKIPPED, std::list<std::string>());
+		} else if (ch == KEY_F(10)) { // exit
+			return std::make_tuple(Screen::INPUT_STATE::EXIT, std::list<std::string>());
 		} else {
 			switch (ch) {
 				case KEY_BACKSPACE:
-					if (navigator.backspace()) {
-						wmove(win_answer, navigator.get_y(), navigator.get_x());
-						wdelch(win_answer);
-					}
+					navigator.backspace();
+					update_screen();
 					break;
 				case KEY_DC:
-					if (navigator.del())
-						wdelch(win_answer);
+					navigator.del();
+					update_screen();
+					break;
+				case KEY_HOME:
+					navigator.home();
+					break;
+				case KEY_END:
+					navigator.end();
+					break;
+				case KEY_PPAGE:
+					navigator.pg_up();
+					break;
+				case KEY_NPAGE:
+					navigator.pg_down();
 					break;
 				case KEY_RIGHT:
 					navigator.right();
@@ -231,28 +334,25 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcusrcesScreen::get_answ
 					break;
 				case '\n':
 					navigator.new_line();
-
-					y = 0;
-					clear_win(win_answer);
-					for (const std::string s: navigator.get_lines())
-						mvwaddstr(win_answer, y++, 0, s.c_str());
-
+					update_screen();
 					break;
 				default:
 					navigator.add_ch(ch);
-					winsch(win_answer, ch);
+					wmove(w, navigator.get_y(), 0);
+					wclrtoeol(w);
+					waddstr(w, navigator.get_current_line().c_str());
 			}
 
 #ifdef DEBUG
 			state_print(keyname(ch));
 #endif
-			wmove(win_answer, navigator.get_y(), navigator.get_x());
-			wrefresh(win_answer);
+			wmove(w, navigator.get_y(), navigator.get_x());
+			wrefresh(w);
 		}
 	}
 }
 
-void NcusrcesScreen::show_result(
+void NcursesScreen::show_result(
 		Screen::CHECK_STATE state,
 		const std::list<std::string> &answer,
 		const std::map<int, int> &errors)
@@ -260,15 +360,20 @@ void NcusrcesScreen::show_result(
 	WINDOW *win = win_result;
 	clear_win(win);
 
+	auto mvwaddstr_colored = [&](int y, int x, const char *str, int color_scheme) {
+		wmove(win, y, x);
+		return waddstr_colored(win, str, color_scheme);
+	};
+
 	if (state == Screen::CHECK_STATE::RIGHT) {
-		mvwaddstr_colored(win, 0, 0, "[right]", 2);
+		mvwaddstr_colored(0, 0, "[right]", MAGENTA);
 	} else if (state == Screen::CHECK_STATE::LINES_NUMBER_ERROR) {
 		int line = 0;
 		if (show_right_answer)
 			for (const std::string s: answer)
 				mvwaddstr(win, line++, 0, s.c_str());
 
-		mvwaddstr_colored(win, line, 0, "[invalid lines number]", 2);
+		mvwaddstr_colored(line, 0, "[invalid lines amount]", MAGENTA);
 	} else if (state == Screen::CHECK_STATE::INVALID) {
 		if (show_right_answer) {
 			int line = 0;
@@ -276,19 +381,19 @@ void NcusrcesScreen::show_result(
 			for (; it != answer.end(); ++it, ++line) {
 				const auto error_it = errors.find(line);
 				if (error_it != errors.end()) {
-					int error_position = error_it->second;
-					mvwaddstr(win, line, 0, it->substr(0, error_position).c_str());
-					mvwaddstr_colored(win, line, error_position, it->substr(error_position).c_str(), 1);
+					int error_x = error_it->second;
+					mvwaddstr(win, line, 0, it->substr(0, error_x).c_str());
+					mvwaddstr_colored(line, error_x, it->substr(error_x).c_str(), RED_BKGR);
 					continue;
 				}
 				mvwaddstr(win, line, 0, it->c_str());
 			}
 		} else
-			mvwaddstr_colored(win, 0, 0, "[invalid answer]", 2);
+			mvwaddstr_colored(0, 0, "[invalid answer]", MAGENTA);
 	} else if (state == Screen::CHECK_STATE::SKIPPED) {
-		mvwaddstr_colored(win, 0, 0, "[skipped]", 2);
+		mvwaddstr_colored(0, 0, "[skipped]", MAGENTA);
 	} else if (state == Screen::CHECK_STATE::ALL_SOLVED) {
-		mvwaddstr_colored(win, 0, 0, "[all problems are solved]", 2);
+		mvwaddstr_colored(0, 0, "[all problems are solved]", MAGENTA);
 	}
 
 	wrefresh(win);
