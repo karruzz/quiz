@@ -1,11 +1,10 @@
 CPPFLAGS = -g -Wall -std=c++11
 CC = g++
-INCLUDES = src/include
+INCLUDES = -Isrc/include -I/usr/include/pocketsphinx -I/usr/include/x86_64-linux-gnu/sphinxbase
 OUT_DIR = output/
 OUT_O_DIR = $(OUT_DIR)objs/
-LIBS = -lboost_filesystem -lboost_system -lncursesw
-SOURCES = src/learn.cpp src/parser.cpp src/viewer.cpp src/ncurces_screen.cpp
-HEADERS=src/include/parser.h src/include/viewer.h
+LIBS = -lboost_filesystem -lboost_system -lncursesw -lpocketsphinx -lsphinxbase -lsphinxad
+SOURCES = src/learn.cpp src/parser.cpp src/ncurces_screen.cpp src/record.cpp
 OBJECTS = $(patsubst src/%.cpp, $(OUT_O_DIR)%.o, $(SOURCES))
 TARGET = learn
 
@@ -27,7 +26,7 @@ $(TARGET): $(OBJECTS)
 
 $(OUT_O_DIR)%.o: src/%.cpp
 	$(dir_guard)
-	$(CC) $(CPPFLAGS) -I$(INCLUDES) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
 	rm -rf $(OUT_DIR) $(TARGET) $(TARGET)d

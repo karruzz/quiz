@@ -24,7 +24,8 @@ public:
 	enum class INPUT_STATE {
 		ENTERED,
 		SKIPPED,
-		EXIT
+		EXIT,
+		NEXT
 	};
 
 	enum class CHECK_STATE {
@@ -44,8 +45,6 @@ public:
 		Screen::CHECK_STATE state,
 		const std::list<std::string> &right_answer,
 		const std::map<int, int> &error) = 0;
-
-	virtual void state_print(const std::string &s) = 0;
 };
 
 class Viewer {

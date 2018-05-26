@@ -95,7 +95,6 @@ int main(int argc, char* argv[])
 
 	std::vector<int> to_solve;
 	std::vector<int>::size_type solving_num;
-	int total_mistakes = 0;
 
 	bool learn_last_error = paramsMap.find(LEARN_LAST_ERROR) != paramsMap.end();
 	for (size_t i = 0; i < problems.size(); ++i) {
@@ -103,22 +102,18 @@ int main(int argc, char* argv[])
 		to_solve.push_back(static_cast<int>(i));
 	}
 
-	std::unique_ptr<view::Screen> screen(new view::NcursesScreen(show_right_answer));
+	view::NcursesScreen screen(show_right_answer);
+	int total_mistakes = 0, problems_total = to_solve.size(), problems_left;
 
-	int problems_total = to_solve.size(), problems_left;
 	while ((problems_left = to_solve.size()) != 0) {
 		std::uniform_int_distribution<> distribution (0, problems_left - 1);
 		solving_num = to_solve[distribution(generator)];
 
-		std::list<std::string> question;
-		std::list<std::string> answer;
+		std::list<std::string> question = problems[solving_num].question;
+		std::list<std::string> answer = problems[solving_num].answer;
 		if (mixed_mode) {
 			std::vector<int>::size_type mixed_random = distribution(generator);
-			question = mixed_random % 2 == 0 ? problems[solving_num].question : problems[solving_num].answer;
-			answer = mixed_random % 2 == 0 ? problems[solving_num].answer : problems[solving_num].question;
-		} else {
-			question = problems[solving_num].question;
-			answer = problems[solving_num].answer;
+			if (mixed_random % 2 == 0) question.swap(answer);
 		}
 
 		view::Statistic statistic = {
@@ -130,28 +125,31 @@ int main(int argc, char* argv[])
 			problems[solving_num].total_errors
 		};
 
-		screen->update_statistic(statistic);
-		screen->show_question(question);
-
 		view::Screen::INPUT_STATE answer_state;
 		std::list<std::string> user_answer;
 		std::map<int, int> errors;
-		std::tie(answer_state, user_answer) = screen->get_answer();
-		user_answer.remove("");
 
-		if (answer_state == view::Screen::INPUT_STATE::EXIT) {
+		try {
+			screen.update_statistic(statistic);
+			screen.show_question(question);
+			std::tie(answer_state, user_answer) = screen.get_answer();
+		} catch(const std::exception &e) {
+			std::cerr << e.what() << std::endl;
 			return 0;
 		}
 
+		user_answer.remove("");
+
+		if (answer_state == view::Screen::INPUT_STATE::EXIT) return 0;
 		if (answer_state == view::Screen::INPUT_STATE::SKIPPED) {
 			to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
-			screen->show_result(view::Screen::CHECK_STATE::SKIPPED, answer, errors);
+			screen.show_result(view::Screen::CHECK_STATE::SKIPPED, answer, errors);
 			continue;
 		}
 
 		if (user_answer.size() != answer.size()) {
 			++total_mistakes;
-			screen->show_result(view::Screen::CHECK_STATE::LINES_NUMBER_ERROR, answer, errors);
+			screen.show_result(view::Screen::CHECK_STATE::LINES_NUMBER_ERROR, answer, errors);
 			continue;
 		}
 
@@ -170,12 +168,12 @@ int main(int argc, char* argv[])
 			++total_mistakes;
 		}
 
-		screen->show_result(check_state, answer, errors);
+		screen.show_result(check_state, answer, errors);
 	}
 
 	Parser::save_statistic(problems, test_file_name);
 
-	screen->show_result(view::Screen::CHECK_STATE::ALL_SOLVED,
+	screen.show_result(view::Screen::CHECK_STATE::ALL_SOLVED,
 		std::list<std::string>(), std::map<int, int>());
 	return 0;
 }

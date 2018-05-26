@@ -6,6 +6,15 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <cstdlib>
+
+#include <record.h>
+
+#define TAB_SIZE 4
+
+#define COLOR_LIGHT_WHITE 15
+#define COLOR_GRAY 8
+#define SERVICE_COLOR YELLOW
 
 namespace view {
 
@@ -22,6 +31,8 @@ WINDOW *NcursesScreen::create_win(int h, int w, int y, int x)
 {
 	WINDOW *win = newwin(h, w, y, x);
 	clear_win(win);
+	wattron(win, COLOR_PAIR(BKGR));
+	wbkgd(win, COLOR_PAIR(BKGR));
 	wins[win] = { x, y, w, h };
 	return win;
 }
@@ -42,16 +53,15 @@ void NcursesScreen::state_print(const std::string &s)
 {
 	clear_win(win_state);
 	wmove(win_state, 0, 0);
-	waddstr_colored(win_state, s.c_str(), MAGENTA);
+	waddstr_colored(win_state, s.c_str(), SERVICE_COLOR);
 	wrefresh(win_state);
 }
-
-#define COLOR_PAIR_INIT(value) init_pair(color::value, COLOR_##value, COLOR_BLACK)
 
 NcursesScreen::NcursesScreen(bool show_right_answer) :
 	show_right_answer(show_right_answer)
 {
 	initscr();
+	set_tabsize(TAB_SIZE);
 	start_color();
 	cbreak();
 	noecho();
@@ -61,6 +71,16 @@ NcursesScreen::NcursesScreen(bool show_right_answer) :
 	int answ_h = (LINES - stat_h - ques_h - state_h) / 2;
 	int resl_h =  LINES - stat_h - ques_h - state_h - answ_h;
 
+	init_pair(CYAN, 14, COLOR_GRAY);
+	init_pair(RED, 9, COLOR_GRAY);
+	init_pair(GREEN, 10, COLOR_GRAY);
+	init_pair(YELLOW, 11, COLOR_GRAY);
+	init_pair(BLUE, 12, COLOR_GRAY);
+	init_pair(MAGENTA, 13, COLOR_GRAY);
+
+	init_pair(RED_BKGR, COLOR_LIGHT_WHITE, COLOR_RED);
+	init_pair(BKGR, COLOR_LIGHT_WHITE, COLOR_GRAY);
+
 	win_statistic = create_win(stat_h,  COLS - 1, 0, 0);
 	win_question  = create_win(ques_h,  COLS - 1, stat_h, 0);
 	win_answer    = create_win(answ_h,  COLS - 1, stat_h + ques_h, 0);
@@ -68,26 +88,23 @@ NcursesScreen::NcursesScreen(bool show_right_answer) :
 	win_state     = create_win(state_h, COLS - 1, stat_h + ques_h + answ_h + resl_h, 0);
 
 	keypad(win_answer, TRUE);
+	keypad(win_result, TRUE);
 
-	COLOR_PAIR_INIT(RED);
-	COLOR_PAIR_INIT(GREEN);
-	COLOR_PAIR_INIT(YELLOW);
-	COLOR_PAIR_INIT(BLUE);
-	COLOR_PAIR_INIT(MAGENTA);
-	COLOR_PAIR_INIT(CYAN);
-	init_pair(color::RED_BKGR, COLOR_WHITE, COLOR_RED);
-
-	state_print(" F2 - check answer       F3 - skip question       F10 - exit");
+	state_print(" F2 - check answer       F3 - skip question       F4 - capture audio       F10 - exit");
 }
 
-NcursesScreen::~NcursesScreen()
-{
+void NcursesScreen::deinit_all() {
 	delwin(win_statistic);
 	delwin(win_question);
 	delwin(win_answer);
 	delwin(win_result);
 	delwin(win_state);
 	endwin();
+}
+
+NcursesScreen::~NcursesScreen()
+{
+	deinit_all();
 }
 
 void NcursesScreen::update_statistic(const Statistic &s)
@@ -126,7 +143,7 @@ class Navigator
 	std::list<std::string> lines;
 	std::list<std::string>::iterator line;
 
-	// position every symbol on screen, need to handle tabs
+	// position of every symbol on screen, need to handle tabs
 	std::list<std::vector<size_t>> positions;
 	std::list<std::vector<size_t>>::iterator position;
 
@@ -139,7 +156,7 @@ class Navigator
 		if (x > line_end) x = line_end;
 	}
 
-	void update_positions(int index)
+	void update_positions(int index = 0)
 	{
 		std::vector<size_t> &pos = *position;
 		std::string str = *line;
@@ -207,14 +224,14 @@ public:
 
 	void end() { x = line->size(); }
 
-	void pg_up() {
+	void page_up() {
 		line = lines.begin();
 		position = positions.begin();
 		y = 0;
 		put_cursor_inside_line();
 	}
 
-	void pg_down() {
+	void page_down() {
 		line = std::prev(lines.end());
 		position = std::prev(positions.end());
 		y = lines_total - 1;
@@ -246,13 +263,13 @@ public:
 	void new_line() {
 		std::string subst = line->substr(x, line->size() - x);
 		line->erase(x, line->size() - x);
-		update_positions(0);
+		update_positions();
 
 		++line;
 		line = lines.insert(line, subst.c_str());
 		++position;
 		position = positions.insert(position, std::vector<size_t>());
-		update_positions(0);
+		update_positions();
 
 		++lines_total;
 		++y;
@@ -265,6 +282,12 @@ public:
 		++x;
 	}
 
+	void add_str(const std::string &s) {
+		line->insert(x, s);
+		update_positions(x);
+		x += s.length();
+	}
+
 	const std::list<std::string> &get_lines() { return lines; }
 	const std::string &get_current_line() { return *line; }
 	size_t get_x() { return x > 0 ? (*position)[x - 1] : 0; }
@@ -273,7 +296,8 @@ public:
 
 std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answer()
 {
-	Navigator navigator(8);
+	Record record;
+	Navigator navigator(TAB_SIZE);
 	WINDOW *w = win_answer;
 
 	auto update_screen = [&] () {
@@ -281,6 +305,12 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answe
 		clear_win(w);
 		for (const std::string s: navigator.get_lines())
 			mvwaddstr(w, y++, 0, s.c_str());
+	};
+
+	auto update_line = [&] () {
+		wmove(w, navigator.get_y(), 0);
+		wclrtoeol(w);
+		waddstr(w, navigator.get_current_line().c_str());
 	};
 
 	clear_win(w);
@@ -315,10 +345,10 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answe
 					navigator.end();
 					break;
 				case KEY_PPAGE:
-					navigator.pg_up();
+					navigator.page_up();
 					break;
 				case KEY_NPAGE:
-					navigator.pg_down();
+					navigator.page_down();
 					break;
 				case KEY_RIGHT:
 					navigator.right();
@@ -336,11 +366,13 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answe
 					navigator.new_line();
 					update_screen();
 					break;
+				case KEY_F(4):
+					navigator.add_str(record.capture());
+					update_line();
+					break;
 				default:
 					navigator.add_ch(ch);
-					wmove(w, navigator.get_y(), 0);
-					wclrtoeol(w);
-					waddstr(w, navigator.get_current_line().c_str());
+					update_line();
 			}
 
 #ifdef DEBUG
@@ -366,14 +398,14 @@ void NcursesScreen::show_result(
 	};
 
 	if (state == Screen::CHECK_STATE::RIGHT) {
-		mvwaddstr_colored(0, 0, "[right]", MAGENTA);
+		mvwaddstr_colored(0, 0, "[right]", SERVICE_COLOR);
 	} else if (state == Screen::CHECK_STATE::LINES_NUMBER_ERROR) {
 		int line = 0;
 		if (show_right_answer)
 			for (const std::string s: answer)
 				mvwaddstr(win, line++, 0, s.c_str());
 
-		mvwaddstr_colored(line, 0, "[invalid lines amount]", MAGENTA);
+		mvwaddstr_colored(line, 0, "[invalid lines amount]", SERVICE_COLOR);
 	} else if (state == Screen::CHECK_STATE::INVALID) {
 		if (show_right_answer) {
 			int line = 0;
@@ -381,23 +413,26 @@ void NcursesScreen::show_result(
 			for (; it != answer.end(); ++it, ++line) {
 				const auto error_it = errors.find(line);
 				if (error_it != errors.end()) {
-					int error_x = error_it->second;
-					mvwaddstr(win, line, 0, it->substr(0, error_x).c_str());
-					mvwaddstr_colored(line, error_x, it->substr(error_x).c_str(), RED_BKGR);
+					int error_since_sym = error_it->second;
+					mvwaddstr(win, line, 0, it->substr(0, error_since_sym).c_str());
+					waddstr_colored(win, it->substr(error_since_sym), RED_BKGR);
 					continue;
 				}
 				mvwaddstr(win, line, 0, it->c_str());
 			}
 		} else
-			mvwaddstr_colored(0, 0, "[invalid answer]", MAGENTA);
+			mvwaddstr_colored(0, 0, "[invalid answer]", SERVICE_COLOR);
 	} else if (state == Screen::CHECK_STATE::SKIPPED) {
-		mvwaddstr_colored(0, 0, "[skipped]", MAGENTA);
+		mvwaddstr_colored(0, 0, "[skipped]", SERVICE_COLOR);
 	} else if (state == Screen::CHECK_STATE::ALL_SOLVED) {
-		mvwaddstr_colored(0, 0, "[all problems are solved]", MAGENTA);
+		mvwaddstr_colored(0, 0, "[all problems are solved]", SERVICE_COLOR);
 	}
 
 	wrefresh(win);
-	wgetch(win);
+	if (wgetch(win) != KEY_F(10)) return;
+
+	deinit_all();
+	std::exit(EXIT_SUCCESS);
 }
 
 } // namespace view

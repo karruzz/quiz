@@ -13,12 +13,13 @@ class NcursesScreen : public Screen
 {
 	enum color {
 		RED = 1,
-		GREEN = 2,
-		YELLOW = 3,
-		BLUE = 4,
-		MAGENTA = 5,
-		CYAN = 6,
-		RED_BKGR = 7
+		GREEN,
+		YELLOW,
+		BLUE,
+		MAGENTA,
+		CYAN,
+		RED_BKGR,
+		BKGR
 	};
 
 	struct Geometry {
@@ -37,16 +38,16 @@ public:
 		const std::list<std::string> &right_answer,
 		const std::map<int, int> &error);
 
-	virtual void state_print(const std::string &s);
-
 private:
 	bool show_right_answer;
 
 	WINDOW *win_statistic, *win_question, *win_answer, *win_result, *win_state;
 	std::map<WINDOW *, Geometry> wins;
 
-	void clear_win(WINDOW *w);
 	WINDOW *create_win(int h, int w, int y, int x);
+	void clear_win(WINDOW *w);
+	void state_print(const std::string &s);
+	void deinit_all();
 };
 
 } // namespace view
