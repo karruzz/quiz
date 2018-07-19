@@ -10,7 +10,7 @@ namespace view {
 
 struct Statistic {
 	int total_problems;
-	int left_problems;
+	int solved_problems;
 	int errors;
 
 	int problem_repeat_times;

@@ -27,7 +27,7 @@ class NcursesScreen : public Screen
 	};
 
 public:
-	NcursesScreen(bool show_right_answer);
+	explicit NcursesScreen(bool show_right_answer);
 	virtual ~NcursesScreen();
 
 	virtual void update_statistic(const Statistic &s);

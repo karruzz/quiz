@@ -6,6 +6,8 @@
 #include <vector>
 #include <map>
 
+#include <stddef.h>
+
 #include <iterator>
 #include <string>
 #include <sstream>
@@ -21,13 +23,17 @@
 #include "problem.h"
 #include "parser.h"
 
-#include <boost/optional.hpp>
-#include <boost/algorithm/string.hpp>
-
 #define NOT_SHOW_ANSWERS "-a"
 #define MIXED_MODE       "-m"  // question-answer mixed with answer-question
-#define SHOW_TAGS        "-s"  // show all tags
-#define LEARN_LAST_ERROR "-e"
+#define SHOW_STATISTIC   "-s"  // show all statistic
+#define LEARN_LAST_ERROR "-e"  // learn only problems, which was with errors last time
+
+//todo:
+// -c - case insensetive
+// -d - recognize Deutch letters
+// wchar, rus lang
+// copy paste
+// screen update on resize
 
 int main(int argc, char* argv[])
 {
@@ -47,11 +53,11 @@ int main(int argc, char* argv[])
 		params.push_back(argv[i]);
 	}
 
-	// split param on keys and values
+	// split params on keys and values
 	std::map<std::string, std::vector<std::string> > paramsMap;
 	std::vector<std::string>::iterator it_params = params.begin();
 	std::string key;
-	for(; it_params != params.end(); it_params++) {
+	for(; it_params != params.end(); ++it_params) {
 		if ((*it_params)[0] == '-') {
 			key = *it_params;
 			paramsMap[key] = std::vector<std::string>();
@@ -74,17 +80,20 @@ int main(int argc, char* argv[])
 
 	std::vector<Problem> problems = Parser::load(test_file_name, paramsMap);
 
-	if (paramsMap.find(SHOW_TAGS) != paramsMap.end()) {
-		std::vector<std::string> tags;
+	if (paramsMap.find(SHOW_STATISTIC) != paramsMap.end()) {
 		for (std::vector<Problem>::iterator it = problems.begin(); it != problems.end(); ++it) {
-			std::vector<std::string> strs;
-			boost::split(strs, it->tag, boost::is_any_of("\t, "));
-			tags.insert(tags.end(), strs.begin(), strs.end());
-		}
+			std::cout << "? ";
+			for (auto it_q = it->question.begin(); it_q != it->question.end(); ++it_q)
+				std::cout << *it_q << std::endl;
 
-		std::sort(tags.begin(), tags.end());
-		for (std::vector<std::string>::iterator it = tags.begin(); it != tags.end(); ++it)
-			std::cout << *it << std::endl;
+			std::cout << "> ";
+#ifdef DEBUG
+			std::cout << "hash: " << it->question_hash << "; ";
+#endif
+			std::cout << "total_errors: " << it->total_errors << "; " ;
+			std::cout << "last_errors: " << it->last_errors << "; ";
+			std::cout << "was attempt: " << it->was_attempt_any_time_before << std::endl << std::endl;
+		}
 		return 0;
 	}
 
@@ -98,15 +107,20 @@ int main(int argc, char* argv[])
 
 	bool learn_last_error = paramsMap.find(LEARN_LAST_ERROR) != paramsMap.end();
 	for (size_t i = 0; i < problems.size(); ++i) {
-		if (learn_last_error && problems[i].last_errors == 0) continue;
+		if (learn_last_error
+			&& problems[i].last_errors == 0
+			&& problems[i].was_attempt_any_time_before)
+		{
+			continue;
+		}
 		to_solve.push_back(static_cast<int>(i));
 	}
 
 	view::NcursesScreen screen(show_right_answer);
-	int total_mistakes = 0, problems_total = to_solve.size(), problems_left;
+	int test_total_errors = 0, problems_total = to_solve.size(), problems_solved = 0;
 
-	while ((problems_left = to_solve.size()) != 0) {
-		std::uniform_int_distribution<> distribution (0, problems_left - 1);
+	while (to_solve.size() != 0) {
+		std::uniform_int_distribution<> distribution (0, to_solve.size() - 1);
 		solving_num = to_solve[distribution(generator)];
 
 		std::list<std::string> question = problems[solving_num].question;
@@ -118,8 +132,8 @@ int main(int argc, char* argv[])
 
 		view::Statistic statistic = {
 			problems_total,
-			problems_left,
-			total_mistakes,
+			problems_solved,
+			test_total_errors,
 			problems[solving_num].repeat,
 			problems[solving_num].errors,
 			problems[solving_num].total_errors
@@ -140,15 +154,24 @@ int main(int argc, char* argv[])
 
 		user_answer.remove("");
 
-		if (answer_state == view::Screen::INPUT_STATE::EXIT) return 0;
+		if (answer_state == view::Screen::INPUT_STATE::EXIT) {
+			Parser::save_statistic(problems, test_file_name);
+			return 0;
+		}
+
 		if (answer_state == view::Screen::INPUT_STATE::SKIPPED) {
 			to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
 			screen.show_result(view::Screen::CHECK_STATE::SKIPPED, answer, errors);
 			continue;
 		}
 
+		problems[solving_num].was_attempt_any_time_before = true;
+		problems[solving_num].was_attempt_this_time = true;
+
 		if (user_answer.size() != answer.size()) {
-			++total_mistakes;
+			++test_total_errors;
+			++problems[solving_num].total_errors;
+			++problems[solving_num].errors;
 			screen.show_result(view::Screen::CHECK_STATE::LINES_NUMBER_ERROR, answer, errors);
 			continue;
 		}
@@ -158,14 +181,15 @@ int main(int argc, char* argv[])
 		if (errors.size() == 0) {
 			check_state = view::Screen::CHECK_STATE::RIGHT;
 			--problems[solving_num].repeat;
+			++problems_solved;
 			if (problems[solving_num].repeat == 0)
 				to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
 		} else {
 			check_state = view::Screen::CHECK_STATE::INVALID;
-			++problems[solving_num].repeat;
+			if (problems[solving_num].repeat < 2) ++problems[solving_num].repeat;
 			++problems[solving_num].total_errors;
 			++problems[solving_num].errors;
-			++total_mistakes;
+			++test_total_errors;
 		}
 
 		screen.show_result(check_state, answer, errors);

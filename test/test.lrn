@@ -2,7 +2,8 @@
 # DEB пакеты (Debian, Ubuntu и тому подобное)
 %dpkg
 @ example
- [repeated text]
+ [repeated text line 1]
+ repeated text line 2
 
 ^ install
 > {{example}}
@@ -17,3 +18,13 @@
 < -How are you?
 # DEB пакеты (Debian, Ubuntu и тому подобное)
 	-Fine
+
+> привет
+  один
+< hello
+  one
+
+> привет
+  два
+< hello
+  two

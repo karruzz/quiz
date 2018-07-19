@@ -2,8 +2,10 @@
 #include <sstream>
 #include <fstream>
 #include <map>
+#include <numeric>
+#include <functional>
+
 #include <boost/filesystem/operations.hpp>
-#include <boost/assign.hpp>
 
 #include "parser.h"
 
@@ -15,7 +17,8 @@ namespace {
 // question file structs
 const char COMMENT   = '#';
 const char TOPIC     = '%';
-const char TAG       = '^';
+const char HASH      = '^';
+const char TAG       = '^';  // deprecated
 const char QUESTION  = '>';
 const char ANSWER    = '<';
 const char BLOCK     = '@'; // for repeated text blocks
@@ -29,7 +32,7 @@ enum parse_state {
 	STATE_ANSWER_PREPARING,
 	STATE_QUESTION_PREPARING,
 	STATE_STATISTIC_PREPARING,
-	STATE_TAG_PREPARING,
+	STATE_HASH_PREPARING,
 	STATE_BLOCK_PREPARING
 };
 
@@ -44,10 +47,9 @@ enum line_type {
 	LINE_BLOCK
 };
 
-#define LINE(X) (X, LINE_##X)
+#define LINE(X) {X, LINE_##X}
 
-std::map<char, line_type> line_types
-	= boost::assign::map_list_of LINE(ANSWER) LINE(COMMENT) LINE(TAG) LINE(QUESTION) LINE(TOPIC) LINE(BLOCK);
+std::map<char, line_type> line_types = { LINE(ANSWER), LINE(COMMENT), LINE(QUESTION), LINE(TOPIC), LINE(TAG), LINE(BLOCK) };
 
 line_type get_line_type(const std::string &line)
 {
@@ -62,25 +64,19 @@ line_type get_line_type(const std::string &line)
 }
 
 struct Statistic {
-	std::string tag;
+	size_t question_hash;
 	int total_errors;
 	int last_errors;
+	bool was_attempt;
 
-	Statistic(std::string tag, int total_errors, int last_errors)
-		: tag(tag), total_errors(total_errors), last_errors(last_errors) {};
+	Statistic(size_t question_hash, int total_errors, int last_errors, bool was_attempt)
+		: question_hash(question_hash), total_errors(total_errors), last_errors(last_errors), was_attempt(was_attempt) {}
 
-	Statistic(const Statistic& p)
-		: tag(p.tag), total_errors(p.total_errors), last_errors(p.last_errors) {};
-
-	Statistic& operator= (const Statistic& p) {
-		tag = p.tag;
-		total_errors = p.total_errors;
-		last_errors = p.last_errors;
-		return *this;
-	}
+	Statistic(const Statistic& p) = default;
+	Statistic& operator= (const Statistic& p) = default;
 
 	bool operator< (const Statistic &p) const {
-		return tag < p.tag;
+		return question_hash < p.question_hash;
 	}
 };
 
@@ -107,9 +103,9 @@ inline void trim_spaces(std::string &s) {
 }
 
 static
-std::map<std::string, Statistic> load_stat(const boost::filesystem::path &lrn_file_path)
+std::map<size_t, Statistic> load_statistic(const boost::filesystem::path &lrn_file_path)
 {
-	std::map<std::string, Statistic> result;
+	std::map<size_t, Statistic> result;
 
 	boost::filesystem::path stat_file_path = "." + lrn_file_path.stem().string() + ".stat";
 	stat_file_path = lrn_file_path.parent_path() / stat_file_path;
@@ -122,25 +118,35 @@ std::map<std::string, Statistic> load_stat(const boost::filesystem::path &lrn_fi
 		return result;
 
 	parse_state previous_state = STATE_NONE;
-	std::string line, tag;
+	std::string line, question_hash_line;
 	while (std::getline(stat_ifstream, line)) {
 		char line_type = line.at(0);
 		TRIM_TYPE(line);
 		trim_spaces(line);
 
 		if (line_type == STATISTIC_QUESTION) {
-			tag = line;
-			previous_state = STATE_TAG_PREPARING;
+			question_hash_line = line;
+			previous_state = STATE_HASH_PREPARING;
 		} else if (line_type == STATISTIC_VALUES) {
-			assert(previous_state == STATE_TAG_PREPARING);
+			assert(previous_state == STATE_HASH_PREPARING);
 
 			int total_errors, last_errors;
-			std::istringstream iss(line);
-			iss >> total_errors >> last_errors;
-			result.insert(std::pair<std::string, Statistic>(tag, Statistic(tag, total_errors, last_errors)));
+			bool was_attempt;
+			std::istringstream stat_ss(line);
+			stat_ss >> total_errors >> last_errors >> was_attempt;
+
+			size_t question_hash;
+			std::istringstream tag_ss(question_hash_line);
+			if (tag_ss >> question_hash) {
 #ifdef DEBUG
-			std::cout << "tag: " << tag << "; total: " << total_errors << "; last: " << last_errors << std::endl;
+				std::cout << "line: " << question_hash_line << "; hash: " << question_hash;
+				std::cout << "; total: " << total_errors << "; last: " << last_errors;
+				std::cout << "; was attempt: " << was_attempt << std::endl;
 #endif
+				result.insert(std::pair<size_t, Statistic>(
+					question_hash, Statistic(question_hash, total_errors, last_errors, was_attempt)));
+			}
+
 			previous_state = STATE_STATISTIC_PREPARING;
 		} else {
 			throw std::runtime_error("invalid statistic line type");
@@ -164,8 +170,10 @@ void Parser::save_statistic(const std::vector<Problem> &problems, const boost::f
 
 	std::vector<Problem>::const_iterator it = problems.begin();
 	for (; it != problems.end(); ++it) {
-		of << TAG << " " << it->tag << std::endl;
-		of << STATISTIC_VALUES << " " << it->total_errors << " " << it->errors << std::endl;
+		of << HASH << " " << it->question_hash << std::endl;
+		of << STATISTIC_VALUES << " " << it->total_errors << " ";
+		of << (it->was_attempt_this_time ? it->errors : it->last_errors) << " ";
+		of << it->was_attempt_any_time_before << std::endl;
 	}
 
 	of.flush();
@@ -189,7 +197,7 @@ std::vector<Problem> Parser::load(
 	bool use_topics = params.find(USE_TOPICS) != params.end();
 	bool desired_topic = false;
 	parse_state prev_state = STATE_NONE, state = STATE_NONE;
-	std::string line, tag, block_name;
+	std::string line, block_name;
 	std::list<std::string> quest, answ, block;
 	int line_num = -1;
 	while (std::getline(lrn_file_ifstream, line)) {
@@ -214,6 +222,7 @@ std::vector<Problem> Parser::load(
 		switch (t) {
 			case (LINE_EMPTY) :
 			case (LINE_COMMENT) :
+			case (LINE_TAG):
 				continue;
 			case (LINE_NO_TYPE):
 				break;
@@ -223,10 +232,6 @@ std::vector<Problem> Parser::load(
 				break;
 			case (LINE_QUESTION) :
 				state = STATE_QUESTION_PREPARING;
-				TRIM_TYPE(line);
-				break;
-			case (LINE_TAG) :
-				state = STATE_TAG_PREPARING;
 				TRIM_TYPE(line);
 				break;
 			case (LINE_BLOCK) :
@@ -240,10 +245,8 @@ std::vector<Problem> Parser::load(
 		if (state != prev_state) {
 			if (prev_state == STATE_ANSWER_PREPARING) {
 				if (quest.size() > 0 && answ.size() > 0) {
-					if (tag.empty()) tag = quest.front();
-					problems.push_back(Problem(tag, quest, answ, 1));
+					problems.push_back(Problem(quest, answ, 1));
 
-					tag.clear();
 					quest.clear();
 					answ.clear();
 				}
@@ -273,8 +276,7 @@ std::vector<Problem> Parser::load(
 					quest.push_back(line);
 			} else
 				quest.push_back(line);
-		} else if (state == STATE_TAG_PREPARING) {
-			tag = line;
+		} else if (state == STATE_HASH_PREPARING) {
 		} else if (state == STATE_QUESTION_PREPARING) {
 			quest.push_back(line);
 		} else if (state == STATE_BLOCK_PREPARING) {
@@ -286,19 +288,24 @@ std::vector<Problem> Parser::load(
 	}
 
 	if (quest.size() > 0 && answ.size() > 0) {
-		if (tag.empty()) tag = quest.front();
-		problems.push_back(Problem(tag, quest, answ, 1));
+		problems.push_back(Problem(quest, answ, 1));
 	}
 
 	lrn_file_ifstream.close();
 
-	std::map<std::string, Statistic> stat = load_stat(lrn_file_path);
-	std::vector<Problem>::iterator it = problems.begin();
-	for (; it != problems.end(); ++it) {
-		std::map<std::string, Statistic>::iterator mit = stat.find(it->tag);
+	for (auto it = problems.begin(); it != problems.end(); ++it) {
+		std::string s = std::accumulate(it->question.begin(), it->question.end(), std::string(""));
+		it->question_hash = std::hash<std::string>()(s);
+	}
+
+	std::map<size_t, Statistic> stat = load_statistic(lrn_file_path);
+
+	for (auto it = problems.begin(); it != problems.end(); ++it) {
+		std::map<size_t, Statistic>::iterator mit = stat.find(it->question_hash);
 		if (mit != stat.end()) {
 			it->total_errors = mit->second.total_errors;
 			it->last_errors = mit->second.last_errors;
+			it->was_attempt_any_time_before = mit->second.was_attempt;
 		}
 	}
 

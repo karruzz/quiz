@@ -53,7 +53,7 @@ void NcursesScreen::state_print(const std::string &s)
 {
 	clear_win(win_state);
 	wmove(win_state, 0, 0);
-	waddstr_colored(win_state, s.c_str(), SERVICE_COLOR);
+	waddstr_colored(win_state, s, SERVICE_COLOR);
 	wrefresh(win_state);
 }
 
@@ -67,7 +67,7 @@ NcursesScreen::NcursesScreen(bool show_right_answer) :
 	noecho();
 
 	const int stat_h = 2, state_h = 1;
-	int ques_h = (LINES - stat_h - state_h) * 2 / 5;
+	int ques_h = (LINES - stat_h - state_h) * 2 / 7;
 	int answ_h = (LINES - stat_h - ques_h - state_h) / 2;
 	int resl_h =  LINES - stat_h - ques_h - state_h - answ_h;
 
@@ -114,7 +114,7 @@ void NcursesScreen::update_statistic(const Statistic &s)
 
 	wmove(w, 0, 1);
 	waddstr_colored(w, "Total:[" + std::to_string(s.total_problems) + "];", GREEN);
-	waddstr_colored(w, " Left:[" + std::to_string(s.left_problems) + "];", CYAN);
+	waddstr_colored(w, " Solved:[" + std::to_string(s.solved_problems) + "];", CYAN);
 	waddstr_colored(w, " Errors:[" + std::to_string(s.errors) + "]", RED);
 
 	wmove(w, 0, 43);
@@ -177,7 +177,7 @@ class Navigator
 	}
 
 public:
-	Navigator(int tab_size) :
+	explicit Navigator(int tab_size) :
 		x(0), y(0), lines_total(1), tab_size(tab_size)
 	{
 		lines = std::list<std::string>(lines_total);
