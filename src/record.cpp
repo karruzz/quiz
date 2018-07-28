@@ -17,7 +17,7 @@ static const char *dict_verbose = "/usr/share/sphinx-voxforge-en/lm/voxforge_en_
 //static const char *lm_default = "/usr/share/pocketsphinx/model/lm/en_US/hub4.5000.DMP";
 //static const char *dict_default = "/usr/share/pocketsphinx/model/lm/en_US/cmu07a.dic";
 
-std::string Record::capture()
+std::string AudioRecord::capture()
 {
 	ps_decoder_t *ps;                  // create pocketsphinx decoder structure
 	cmd_ln_t *config;                  // create configuration structure

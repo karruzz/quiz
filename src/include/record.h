@@ -3,7 +3,7 @@
 
 #include <string>
 
-class Record {
+class AudioRecord {
 public:
 	std::string capture();
 };

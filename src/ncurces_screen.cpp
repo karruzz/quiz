@@ -1,9 +1,10 @@
 #include <ncurces_screen.h>
-#include <ncurses.h>
+#include <ncursesw/ncurses.h>
 
 #include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <cstring>
 #include <cstdlib>
@@ -117,11 +118,16 @@ void NcursesScreen::update_statistic(const Statistic &s)
 	waddstr_colored(w, " Solved:[" + std::to_string(s.solved_problems) + "];", CYAN);
 	waddstr_colored(w, " Errors:[" + std::to_string(s.errors) + "]", RED);
 
-	wmove(w, 0, 43);
-	waddstr(w, "PROBLEM:");
-	waddstr_colored(w, " Repeat:[" + std::to_string(s.problem_repeat_times) + "];", YELLOW);
-	waddstr_colored(w, " Errors:[" + std::to_string(s.problem_errors) + "];", BLUE);
-	waddstr_colored(w, " Total errors:[" + std::to_string(s.problem_total_errors) + "]", MAGENTA);
+	const std::string &problem = "PROBLEM:";
+	const std::string &repeat = " Repeat:[" + std::to_string(s.problem_repeat_times) + "];";
+	const std::string &errors = " Errors:[" + std::to_string(s.problem_errors) + "];";
+	const std::string &total_errors = " Total errors:[" + std::to_string(s.problem_total_errors) + "]";
+	wmove(w, 0, COLS - (problem + repeat + errors + total_errors).size() - 2);
+
+	waddstr(w, problem.c_str());
+	waddstr_colored(w, repeat, YELLOW);
+	waddstr_colored(w, errors, BLUE);
+	waddstr_colored(w, total_errors, MAGENTA);
 
 	wrefresh(w);
 }
@@ -140,163 +146,174 @@ void NcursesScreen::show_question(const std::list<std::string> &question)
 
 class Navigator
 {
-	std::list<std::string> lines;
-	std::list<std::string>::iterator line;
+	const size_t tab_width;
+	const size_t ascii_width;
+	const size_t utf8_width;
 
-	// position of every symbol on screen, need to handle tabs
-	std::list<std::vector<size_t>> positions;
-	std::list<std::vector<size_t>>::iterator position;
+	std::vector<std::string> lines;
+	// position of every symbol of lines on screen, need to handle tabs and utf-8 pair symbols
+	std::vector<std::vector<size_t>> screen_positions;
 
-	size_t x, y, lines_total;
-	int tab_size;
+	size_t cursor_x, cursor_y;
 
-	void put_cursor_inside_line()
+	bool is_ascii(char c) { return c > 0; }
+	size_t sym_width(char c) { return is_ascii(c) ? ascii_width : utf8_width; }
+
+	void move_cursor_inside_line()
 	{
-		size_t line_end = line->size();
-		if (x > line_end) x = line_end;
+		size_t line_end = lines[cursor_y].size();
+		if (cursor_x > line_end) cursor_x = line_end;
 	}
 
-	void update_positions(int index = 0)
+	void update_screen_positions(size_t x, size_t y)
 	{
-		std::vector<size_t> &pos = *position;
-		std::string str = *line;
+		if (screen_positions[y].size() != lines[y].size())
+			screen_positions[y].resize(lines[y].size());
 
-		if (pos.size() < str.size()) pos.resize(str.size());
+		size_t screen_x = (x > 0) ? screen_positions[y][x - 1] : 0;
+		while(x < lines[y].size()) {
+			if (lines[y][x] == '\t') {
+				size_t next = screen_x + tab_width;
+				screen_x = next - next % tab_width;
+			} else
+				++screen_x;
 
-		size_t x_prev = (index > 0) ? pos[index - 1] : 0;
-		for (size_t i = index; i < str.size(); ++i)
-			if (str[i] != '\t') {
-				pos[i] = ++x_prev;
-			} else {
-				size_t next = x_prev + tab_size;
-				x_prev = next - next % tab_size;
-				pos[i] = x_prev;
-			}
+			size_t w = sym_width(lines[y][x]);
+			for (size_t j = 0; j < w; ++j)
+				screen_positions[y][x + j] = screen_x;
 
-		if (pos.size() > str.size()) pos.resize(str.size());
+			x += w;
+		}
 	}
 
 public:
-	explicit Navigator(int tab_size) :
-		x(0), y(0), lines_total(1), tab_size(tab_size)
+	explicit Navigator(size_t tab_size)
+		: tab_width(tab_size)
+		, ascii_width(1)
+		, utf8_width(2)
+		, cursor_x(0)
+		, cursor_y(0)
 	{
-		lines = std::list<std::string>(lines_total);
-		line = lines.begin();
-		positions = std::list<std::vector<size_t>>(lines_total);
-		position = positions.begin();
+		lines = std::vector<std::string>(1);
+		screen_positions = std::vector<std::vector<size_t>>(1);
 	}
 
 	void backspace() {
-		if (x != 0) {
-			line->erase(--x, 1);
-		} else {
-			if (line == lines.begin()) return;
-			std::string subst = *line;
-			line = std::prev(lines.erase(line));
-			position = std::prev(positions.erase(position));
-
-			--y;
-			x = line->size();
-			line->append(subst);
-			--lines_total;
+		if (cursor_x != 0) {
+			size_t width = sym_width(lines[cursor_y][cursor_x - 1]);
+			cursor_x -=  width;
+			lines[cursor_y].erase(cursor_x, width);
+		} else { // begin of line
+			if (cursor_y == 0) return;
+			std::string subst = lines[cursor_y];
+			lines.erase(lines.begin() + cursor_y);
+			screen_positions.erase(screen_positions.begin() + cursor_y);
+			--cursor_y;
+			cursor_x = lines[cursor_y].size();
+			lines[cursor_y].append(subst);
 		}
 
-		update_positions(x);
+		update_screen_positions(cursor_x, cursor_y);
 	}
 
 	void del() {
-		if (x != line->size()) {
-			line->erase(x, 1);
-		} else {
-			if (line == std::prev(lines.end())) return;
-			auto next = std::next(line);
-			std::string subst = *next;
-			lines.erase(next);
-			positions.erase(std::next(position));
-			line->append(subst);
-			--lines_total;
+		if (cursor_x != lines[cursor_y].size()) {
+			size_t width = sym_width(lines[cursor_y][cursor_x]);
+			lines[cursor_y].erase(cursor_x, width);
+		} else { // end of line
+			if (cursor_y == lines.size() - 1) return;
+			std::string subst = lines[cursor_y + 1];
+			lines.erase(lines.begin() + cursor_y + 1);
+			screen_positions.erase(screen_positions.begin()  + cursor_y + 1);
+			lines[cursor_y].append(subst);
 		}
 
-		update_positions(x);
+		update_screen_positions(cursor_x, cursor_y);
 	}
 
-	void home() { x = 0; }
+	void home() { cursor_x = 0; }
 
-	void end() { x = line->size(); }
+	void end() { cursor_x = lines[cursor_y].size(); }
 
 	void page_up() {
-		line = lines.begin();
-		position = positions.begin();
-		y = 0;
-		put_cursor_inside_line();
+		cursor_y = 0;
+		move_cursor_inside_line();
 	}
 
 	void page_down() {
-		line = std::prev(lines.end());
-		position = std::prev(positions.end());
-		y = lines_total - 1;
-		put_cursor_inside_line();
+		cursor_y = lines.size() - 1;
+		move_cursor_inside_line();
 	}
 
-	void right() { if (x < line->size()) ++x; }
+	void right() {
+		if (cursor_x >= lines[cursor_y].size()) return;
+		cursor_x += sym_width(lines[cursor_y][cursor_x]);
+	}
 
-	void left() { if (x > 0) --x; }
+	void left() {
+		if (cursor_x == 0) return;
+		cursor_x -= sym_width(lines[cursor_y][cursor_x - 1]);
+	}
 
 	void up() {
-		if (line == lines.begin()) return;
-
-		--y;
-		--line;
-		--position;
-		put_cursor_inside_line();
+		if (cursor_y == 0) return;
+		--cursor_y;
+		move_cursor_inside_line();
 	}
 
 	void down() {
-		if (line == std::prev(lines.end())) return;
-
-		++y;
-		++line;
-		++position;
-		put_cursor_inside_line();
+		if (cursor_y == lines.size() - 1) return;
+		++cursor_y;
+		move_cursor_inside_line();
 	}
 
 	void new_line() {
-		std::string subst = line->substr(x, line->size() - x);
-		line->erase(x, line->size() - x);
-		update_positions();
+		std::string &&remaining_subst = lines[cursor_y].substr(cursor_x);
+		lines[cursor_y].erase(cursor_x);
+		update_screen_positions(cursor_x, cursor_y);
 
-		++line;
-		line = lines.insert(line, subst.c_str());
-		++position;
-		position = positions.insert(position, std::vector<size_t>());
-		update_positions();
-
-		++lines_total;
-		++y;
-		x = 0;
+		++cursor_y;
+		lines.insert(lines.begin() + cursor_y, remaining_subst);
+		screen_positions.insert(screen_positions.begin() + cursor_y, std::vector<size_t>());
+		cursor_x = 0;
+		update_screen_positions(cursor_x, cursor_y);
 	}
 
 	void add_ch(char ch) {
-		line->insert(x, 1, ch);
-		update_positions(x);
-		++x;
+		lines[cursor_y].insert(cursor_x, 1, ch);
+		update_screen_positions(cursor_x, cursor_y);
+		cursor_x += ascii_width;
+	}
+
+	void add_wch(char ch_high, char ch_low) {
+		lines[cursor_y].insert(cursor_x, 1, ch_low);
+		lines[cursor_y].insert(cursor_x, 1, ch_high);
+		update_screen_positions(cursor_x, cursor_y);
+		cursor_x += utf8_width;
 	}
 
 	void add_str(const std::string &s) {
-		line->insert(x, s);
-		update_positions(x);
-		x += s.length();
+		lines[cursor_y].insert(cursor_x, s);
+		update_screen_positions(cursor_x, cursor_y);
+		cursor_x += s.length();
 	}
 
-	const std::list<std::string> &get_lines() { return lines; }
-	const std::string &get_current_line() { return *line; }
-	size_t get_x() { return x > 0 ? (*position)[x - 1] : 0; }
-	size_t get_y() { return y; }
+	const std::vector<std::string> &get_lines() { return lines; }
+
+	std::list<std::string> get_lines_list() {
+		std::list<std::string> result;
+		std::copy( lines.begin(), lines.end(), std::back_inserter( result ) );
+		return result;
+	}
+
+	const std::string &get_current_line() { return lines[cursor_y]; }
+	size_t get_screen_x() { return cursor_x > 0 ? screen_positions[cursor_y][cursor_x - 1] : 0; }
+	size_t get_screen_y() { return cursor_y; }
 };
 
 std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answer()
 {
-	Record record;
+	AudioRecord audio_record;
 	Navigator navigator(TAB_SIZE);
 	WINDOW *w = win_answer;
 
@@ -308,7 +325,7 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answe
 	};
 
 	auto update_line = [&] () {
-		wmove(w, navigator.get_y(), 0);
+		wmove(w, navigator.get_screen_y(), 0);
 		wclrtoeol(w);
 		waddstr(w, navigator.get_current_line().c_str());
 	};
@@ -323,7 +340,7 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answe
 		if (ch == ERR) {
 			throw std::runtime_error("wgetch error");
 		} else if (ch == KEY_F(2)) { // finish answer
-			return std::make_tuple(Screen::INPUT_STATE::ENTERED, navigator.get_lines());
+			return std::make_tuple(Screen::INPUT_STATE::ENTERED, navigator.get_lines_list());
 		} else if (ch == KEY_F(3)) { // skip question
 			return std::make_tuple(Screen::INPUT_STATE::SKIPPED, std::list<std::string>());
 		} else if (ch == KEY_F(10)) { // exit
@@ -367,18 +384,25 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NcursesScreen::get_answe
 					update_screen();
 					break;
 				case KEY_F(4):
-					navigator.add_str(record.capture());
+					navigator.add_str(audio_record.capture());
 					update_line();
 					break;
 				default:
-					navigator.add_ch(ch);
+					if (ch <= 128) {
+						navigator.add_ch(ch);
+					} else {
+						int ch_low = wgetch(w);
+						navigator.add_wch(ch, ch_low);
+					}
 					update_line();
 			}
 
 #ifdef DEBUG
-			state_print(keyname(ch));
+			std::stringstream ss;
+			ss << keyname(ch) << "; x: " << navigator.get_screen_x() << "; y: " << navigator.get_screen_y();
+			state_print(ss.str());
 #endif
-			wmove(w, navigator.get_y(), navigator.get_x());
+			wmove(w, navigator.get_screen_y(), navigator.get_screen_x());
 			wrefresh(w);
 		}
 	}

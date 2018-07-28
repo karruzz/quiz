@@ -18,6 +18,8 @@
 #include <cctype>
 #include <tuple>
 
+#include <locale.h>
+
 #include "viewer.h"
 #include "ncurces_screen.h"
 #include "problem.h"
@@ -28,12 +30,12 @@
 #define SHOW_STATISTIC   "-s"  // show all statistic
 #define LEARN_LAST_ERROR "-e"  // learn only problems, which was with errors last time
 
-//todo:
+// todo:
 // -c - case insensetive
 // -d - recognize Deutch letters
-// wchar, rus lang
 // copy paste
 // screen update on resize
+// all list to vector
 
 int main(int argc, char* argv[])
 {
@@ -47,7 +49,7 @@ int main(int argc, char* argv[])
 	bool show_right_answer = true;
 	bool mixed_mode = false;
 
-	//save all params, besides first
+	// save all params beside first
 	std::vector<std::string> params;
 	for (int i = 2; i < argc; i++) {
 		params.push_back(argv[i]);
@@ -92,7 +94,7 @@ int main(int argc, char* argv[])
 #endif
 			std::cout << "total_errors: " << it->total_errors << "; " ;
 			std::cout << "last_errors: " << it->last_errors << "; ";
-			std::cout << "was attempt: " << it->was_attempt_any_time_before << std::endl << std::endl;
+			std::cout << "was attempts: " << it->was_attempt_any_time_before << std::endl << std::endl;
 		}
 		return 0;
 	}

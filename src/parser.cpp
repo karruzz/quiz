@@ -141,7 +141,7 @@ std::map<size_t, Statistic> load_statistic(const boost::filesystem::path &lrn_fi
 #ifdef DEBUG
 				std::cout << "line: " << question_hash_line << "; hash: " << question_hash;
 				std::cout << "; total: " << total_errors << "; last: " << last_errors;
-				std::cout << "; was attempt: " << was_attempt << std::endl;
+				std::cout << "; was attempts: " << was_attempt << std::endl;
 #endif
 				result.insert(std::pair<size_t, Statistic>(
 					question_hash, Statistic(question_hash, total_errors, last_errors, was_attempt)));
