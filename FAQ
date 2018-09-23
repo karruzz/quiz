@@ -1,0 +1,3 @@
+dependence:
+libncurses5-dev libncursesw5-dev
+libpocketsphinx-dev libsphinxbase-dev

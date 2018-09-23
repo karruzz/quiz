@@ -25,10 +25,11 @@
 #include "problem.h"
 #include "parser.h"
 
-#define NOT_SHOW_ANSWERS "-a"
-#define MIXED_MODE       "-m"  // question-answer mixed with answer-question
-#define SHOW_STATISTIC   "-s"  // show all statistic
-#define LEARN_LAST_ERROR "-e"  // learn only problems, which was with errors last time
+#define SHOW_HELP        "-h"  // show help
+#define NOT_SHOW_ANSWERS "-a"  // not show right answer when was mistake
+#define MIXED_MODE       "-m"  // question-answer mode mixed with answer-question mode
+#define SHOW_STATISTIC   "-s"  // show statistic
+#define REPEAT_ERRORS    "-r"  // repeat only problems, which were with errors last time
 
 // todo:
 // -c - case insensetive
@@ -36,6 +37,9 @@
 // copy paste
 // screen update on resize
 // all list to vector
+// -h help
+// -l auto language
+// update statistic line for current question after answer instantly
 
 int main(int argc, char* argv[])
 {
@@ -74,6 +78,15 @@ int main(int argc, char* argv[])
 		paramsMap[key].push_back(*it_params);
 	}
 
+	if (test_file_name == "-h" || paramsMap.find(SHOW_HELP) != paramsMap.end()) {
+		std::cout << "-h	show this help" << std::endl;
+		std::cout << "-a	not show answers" << std::endl;
+		std::cout << "-m	question-answer mode mixed with answer-question mode" << std::endl;
+		std::cout << "-s	show statistic" << std::endl;
+		std::cout << "-r	repeat only problems, which were with errors last time" << std::endl;
+		return 0;
+	}
+
 	if (paramsMap.find(NOT_SHOW_ANSWERS) != paramsMap.end())
 		show_right_answer = false;
 
@@ -107,9 +120,9 @@ int main(int argc, char* argv[])
 	std::vector<int> to_solve;
 	std::vector<int>::size_type solving_num;
 
-	bool learn_last_error = paramsMap.find(LEARN_LAST_ERROR) != paramsMap.end();
+	bool repeat_errors_only = paramsMap.find(REPEAT_ERRORS) != paramsMap.end();
 	for (size_t i = 0; i < problems.size(); ++i) {
-		if (learn_last_error
+		if (repeat_errors_only
 			&& problems[i].last_errors == 0
 			&& problems[i].was_attempt_any_time_before)
 		{
@@ -118,7 +131,7 @@ int main(int argc, char* argv[])
 		to_solve.push_back(static_cast<int>(i));
 	}
 
-	view::NcursesScreen screen(show_right_answer);
+	view::ncurses::NScreen screen(show_right_answer);
 	int test_total_errors = 0, problems_total = to_solve.size(), problems_solved = 0;
 
 	while (to_solve.size() != 0) {
@@ -183,9 +196,10 @@ int main(int argc, char* argv[])
 		if (errors.size() == 0) {
 			check_state = view::Screen::CHECK_STATE::RIGHT;
 			--problems[solving_num].repeat;
-			++problems_solved;
-			if (problems[solving_num].repeat == 0)
+			if (problems[solving_num].repeat == 0) {
+				++problems_solved;
 				to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
+			}
 		} else {
 			check_state = view::Screen::CHECK_STATE::INVALID;
 			if (problems[solving_num].repeat < 2) ++problems[solving_num].repeat;
