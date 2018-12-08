@@ -26,8 +26,8 @@ class Editor
 public:
 	explicit Editor(size_t tab_size);
 
-	void backspace();
-	void del();
+	bool backspace();
+	bool del();
 	void home();
 	void end();
 	void page_up();

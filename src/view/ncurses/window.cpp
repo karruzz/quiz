@@ -7,6 +7,7 @@ namespace ncurses {
 #define SERVICE_COLOR YELLOW
 
 Window::Window(const Geometry &g)
+	: mode(Mode::WAIT)
 {
 	geometry = g;
 	create();
@@ -66,7 +67,7 @@ void StatisticWindow::refresh()
 	clear();
 
 	wmove(window, 0, 1);
-	waddstr_colored("Total:[" + std::to_string(statistic.total_problems) + "];", GREEN);
+	waddstr_colored("Left:[" + std::to_string(statistic.left_problems) + "];", GREEN);
 	waddstr_colored(" Solved:[" + std::to_string(statistic.solved_problems) + "];", CYAN);
 	waddstr_colored(" Errors:[" + std::to_string(statistic.errors) + "]", RED);
 
@@ -95,46 +96,14 @@ void QuestionWindow::refresh()
 	wrefresh(window);
 }
 
-void ResultWindow::refresh()
+void SolutionWindow::refresh()
 {
 	clear();
-	if (!enable_result) return;
+	if (mode != Mode::OUTPUT) return;
 
-	auto mvwaddstr_colored = [&](int y, int x, const char *str, int color_scheme) {
-		wmove(window, y, x);
-		return waddstr_colored(str, color_scheme);
-	};
-
-	if (state == Screen::CHECK_STATE::RIGHT) {
-		mvwaddstr_colored(0, 0, "[right]", SERVICE_COLOR);
-	} else if (state == Screen::CHECK_STATE::LINES_NUMBER_ERROR) {
-		int line = 0;
-		if (show_right_answer)
-			for (const std::string s: answer)
-				mvwaddstr(window, line++, 0, s.c_str());
-
-		mvwaddstr_colored(line, 0, "[invalid lines amount]", SERVICE_COLOR);
-	} else if (state == Screen::CHECK_STATE::INVALID) {
-		if (show_right_answer) {
-			int line = 0;
-			std::list<std::string>::const_iterator it = answer.begin();
-			for (; it != answer.end(); ++it, ++line) {
-				const auto error_it = errors.find(line);
-				if (error_it != errors.end()) {
-					int error_since_sym = error_it->second;
-					mvwaddstr(window, line, 0, it->substr(0, error_since_sym).c_str());
-					waddstr_colored(it->substr(error_since_sym), RED_BKGR);
-					continue;
-				}
-				mvwaddstr(window, line, 0, it->c_str());
-			}
-		} else
-			mvwaddstr_colored(0, 0, "[invalid answer]", SERVICE_COLOR);
-	} else if (state == Screen::CHECK_STATE::SKIPPED) {
-		mvwaddstr_colored(0, 0, "[skipped]", SERVICE_COLOR);
-	} else if (state == Screen::CHECK_STATE::ALL_SOLVED) {
-		mvwaddstr_colored(0, 0, "[all problems are solved]", SERVICE_COLOR);
-	}
+	int line = 0;
+	for (const std::string s: solution)
+		mvwaddstr(window, line++, 0, s.c_str());
 
 	wrefresh(window);
 }
@@ -142,17 +111,56 @@ void ResultWindow::refresh()
 void MessageWindow::refresh()
 {
 	clear();
-	wmove(window, 0, 0);
+	wmove(window, 0, 1);
 	waddstr_colored(message, SERVICE_COLOR);
+
+	std::string lan = lan_to_str();
+	wmove(window, 0, geometry.w - lan.size() - 1);
+	waddstr_colored(lan, SERVICE_COLOR);
 	wrefresh(window);
 }
 
 void AnswerWindow::update_screen()
 {
 	clear();
-	int y = 0;
-	for (const std::string s: editor->get_lines())
-		mvwaddstr(window, y++, 0, s.c_str());
+	const std::vector<std::string>& answer = editor->get_lines();
+
+	size_t y = 0;
+	if (mode == Mode::INPUT) {
+		for (const std::string s: answer)
+			mvwaddstr(window, y++, 0, s.c_str());
+	} else if (mode == Mode::OUTPUT) {
+		static auto mvwaddstr_colored = [&](int y, int x, const char *str, int color_scheme) {
+			wmove(window, y, x);
+			return waddstr_colored(str, color_scheme);
+		};
+
+		for (auto line_it = verification.answer.begin()
+			 ; line_it != verification.answer.end(); ++line_it, ++y) {
+			const auto error_it = verification.errors.find(y);
+			if (error_it != verification.errors.end()) {
+				size_t error_since_sym = static_cast<size_t>(error_it->second);
+				if (error_since_sym < line_it->size()) {
+					mvwaddstr(window, y, 0, line_it->substr(0, error_since_sym).c_str());
+					waddstr_colored(line_it->substr(error_since_sym), RED_BKGR);
+				} else {
+					mvwaddstr(window, y, 0, line_it->c_str());
+					waddstr_colored(" ", RED_BKGR);
+				}
+				continue;
+			}
+			mvwaddstr(window, y, 0, line_it->c_str());
+		}
+
+		++y;
+		if (verification.state == analysis::MARK::RIGHT) {
+			mvwaddstr_colored(y, 0, "[right]", SERVICE_COLOR);
+		} else if (verification.state == analysis::MARK::INVALID_LINES_NUMBER) {
+			mvwaddstr_colored(y, 0, "[invalid lines amount]", SERVICE_COLOR);
+		} else if (verification.state == analysis::MARK::ERROR) {
+			mvwaddstr_colored(y, 0, "[invalid answer]", SERVICE_COLOR);
+		}
+	}
 }
 
 void AnswerWindow::update_line()
@@ -169,16 +177,14 @@ void AnswerWindow::refresh()
 	wrefresh(window);
 }
 
-void AnswerWindow::key_pressed(int key)
+void AnswerWindow::key_process(int key)
 {
 	switch (key) {
 		case KEY_BACKSPACE:
-			editor->backspace();
-			update_screen();
+			editor->backspace() ? update_screen() : update_line();
 			break;
 		case KEY_DC:
-			editor->del();
-			update_screen();
+			editor->del() ? update_screen() : update_line();
 			break;
 		case KEY_HOME:
 			editor->home();
@@ -235,12 +241,19 @@ void AnswerWindow::key_pressed(int key)
 }
 
 void AnswerWindow::prepare() {
+	mode = Mode::INPUT;
 	editor.reset(new Editor(tab_size));
 	update_cursor({ editor->get_screen_x(), editor->get_screen_y() });
 	update_screen();
 }
 
-std::list<std::string> AnswerWindow::get_answer()
+void AnswerWindow::show_analysed(const analysis::Verification& v) {
+	mode = Mode::OUTPUT;
+	verification = v;
+	update_screen();
+}
+
+std::list<std::string> AnswerWindow::get_lines()
 {
 	return editor->get_lines_list();
 }

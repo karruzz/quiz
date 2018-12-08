@@ -41,37 +41,43 @@ Editor::Editor(size_t tab_size)
 	screen_positions = std::vector<std::vector<size_t>>(1);
 }
 
-void Editor::backspace() {
+bool Editor::backspace() {
+	bool update_all_screen = false;
 	if (cursor_x != 0) {
 		size_t width = sym_width(lines[cursor_y][cursor_x - 1]);
 		cursor_x -=  width;
 		lines[cursor_y].erase(cursor_x, width);
 	} else { // begin of the line
-		if (cursor_y == 0) return;
+		if (cursor_y == 0) return update_all_screen;
 		std::string subst = lines[cursor_y];
 		lines.erase(lines.begin() + cursor_y);
 		screen_positions.erase(screen_positions.begin() + cursor_y);
 		--cursor_y;
 		cursor_x = lines[cursor_y].size();
 		lines[cursor_y].append(subst);
+		update_all_screen = true;
 	}
 
 	update_screen_positions(cursor_x, cursor_y);
+	return update_all_screen;
 }
 
-void Editor::del() {
+bool Editor::del() {
+	bool update_all_screen = false;
 	if (cursor_x != lines[cursor_y].size()) {
 		size_t width = sym_width(lines[cursor_y][cursor_x]);
 		lines[cursor_y].erase(cursor_x, width);
 	} else { // end of line
-		if (cursor_y == lines.size() - 1) return;
+		if (cursor_y == lines.size() - 1) return update_all_screen;
 		std::string subst = lines[cursor_y + 1];
 		lines.erase(lines.begin() + cursor_y + 1);
 		screen_positions.erase(screen_positions.begin()  + cursor_y + 1);
 		lines[cursor_y].append(subst);
+		update_all_screen = true;
 	}
 
 	update_screen_positions(cursor_x, cursor_y);
+	return update_all_screen;
 }
 
 void Editor::home() { cursor_x = 0; }

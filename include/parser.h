@@ -18,10 +18,6 @@ public:
 	static void save_statistic(
 			const std::vector<Problem> &problems,
 			const boost::filesystem::path &path);
-
-	static std::map<int, int> check_answer(
-			const std::list<std::string> &user_answer,
-			const std::list<std::string> &right_answer);
 };
 
 #endif // PARSER_H

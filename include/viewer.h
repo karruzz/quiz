@@ -6,16 +6,25 @@
 #include <iostream>
 #include <string>
 
+#include "problem.h"
+#include "analyzer.h"
+
 namespace view {
 
 struct Statistic {
-	int total_problems;
+	int left_problems;
 	int solved_problems;
 	int errors;
 
 	int problem_repeat_times;
 	int problem_errors;
 	int problem_total_errors;
+};
+
+enum class LANGUAGE {
+	UNKNOWN,
+	EN,
+	RU
 };
 
 class Screen
@@ -25,26 +34,21 @@ public:
 		ENTERED,
 		SKIPPED,
 		EXIT,
-		NEXT
-	};
-
-	enum class CHECK_STATE {
-		RIGHT,
-		SKIPPED,
-		LINES_NUMBER_ERROR,
-		INVALID,
-		ALL_SOLVED
+		NEXT,
+		PLAY
 	};
 
 	virtual ~Screen() { }
 
-	virtual void update_statistic(const Statistic &statistic) = 0;
-	virtual void show_question(const std::list<std::string> &question) = 0;
 	virtual std::tuple<INPUT_STATE, std::list<std::string>> get_answer() = 0;
-	virtual void show_result(
-		Screen::CHECK_STATE state,
-		const std::list<std::string> &right_answer,
-		const std::map<int, int> &error) = 0;
+	virtual int wait_pressed_key() = 0;
+
+	virtual void set_language(LANGUAGE layout) = 0;
+	virtual void update_statistic(const Statistic& statistic) = 0;
+	virtual void show_problem(const Problem&) = 0;
+	virtual void show_result(const analysis::Verification&) = 0;
+	virtual void show_solution() = 0;
+	virtual void show_message(const std::string& s) = 0;
 };
 
 class Viewer {

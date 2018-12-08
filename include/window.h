@@ -7,14 +7,14 @@
 #include <ncursesw/ncurses.h>
 
 #include <editor.h>
-#include <record.h>
+#include <voice.h>
 #include <viewer.h>
 
 namespace view {
 
 namespace ncurses {
 
-enum Color {
+enum COLOR {
 	RED = 1,
 	GREEN,
 	YELLOW,
@@ -36,6 +36,13 @@ struct Geometry {
 class Window
 {
 protected:
+	enum class Mode {
+		WAIT,
+		INPUT,
+		OUTPUT
+	};
+
+	Mode mode;
 	WINDOW *window;
 	Geometry geometry;
 
@@ -58,28 +65,38 @@ class CursorWindow : public Window
 	Point cursor = { 0, 0 };
 	bool focused;
 
+	std::function<void()> resize_handle;
+
 protected:
 	void update_cursor(Point position) { cursor = position; }
 
 public:
-	CursorWindow(const Geometry &g) : Window(g) {}
+	CursorWindow(const Geometry &g, const std::function<void()>& resize)
+		: Window(g)
+		, resize_handle(resize)
+	{}
 
-	void focus(bool enable) {
+	void focus(bool enable, bool show_cursor = true) {
 		focused = enable;
 		keypad(window, focused ? TRUE : FALSE);
-		if (focused)
-			wmove(window, cursor.y, cursor.x);
+		if (!focused) return;
+
+		curs_set(show_cursor ? 1 : 0);
+		wmove(window, cursor.y, cursor.x);
 	}
 
-	int getkey() { return wgetch(window); }
-	void virtual key_pressed(int ch) = 0;
-
-	void add_resize_handler(std::function<void()> cb) {
-		resize_callback = cb;
+	int get_key()
+	{
+		for (;;) {
+			int key = wgetch(window);
+			if (key == ERR)
+				throw std::runtime_error("CursorWindow: wgetch error");
+			if (key == KEY_RESIZE)
+				resize_handle();
+			else
+				return key;
+		}
 	}
-
-private:
-	std::function<void()> resize_callback;
 };
 
 class AnswerWindow : public CursorWindow
@@ -87,26 +104,32 @@ class AnswerWindow : public CursorWindow
 	AudioRecord audio_record;
 	std::unique_ptr<Editor> editor;
 	int tab_size;
+//	std::map<int, std::list<int>> errors;
+
+	analysis::Verification verification;
 
 	void update_screen();
 	void update_line();
 public:
-	AnswerWindow(const Geometry &g, int tab_size_) :
-		CursorWindow(g),
-		tab_size(tab_size_)
+	AnswerWindow(const Geometry &g, const std::function<void()>& resize, int tab_size_)
+		: CursorWindow(g, resize)
+		, tab_size(tab_size_)
 	{ }
 
 	virtual void refresh();
-	void virtual key_pressed(int ch);
+	void key_process(int ch);
 
 	void prepare();
-	std::list<std::string> get_answer();
+	std::list<std::string> get_lines();
+	void show_analysed(const analysis::Verification& v);
 };
 
 class StatisticWindow : public Window {
 	Statistic statistic;
 public:
-	StatisticWindow(Geometry g) : Window(g) {}
+	StatisticWindow(Geometry g)
+		: Window(g)
+	{}
 
 	virtual void refresh();
 
@@ -119,58 +142,66 @@ public:
 class QuestionWindow : public Window {
 	std::list<std::string> question;
 public:
-	QuestionWindow(Geometry g) : Window(g) {}
-
-	virtual void refresh();
-
-	void update_question(const std::list<std::string> &q) {
-		question = q;
-		refresh();
-	}
-};
-
-class ResultWindow : public Window {
-	bool enable_result;
-	bool show_right_answer;
-
-	Screen::CHECK_STATE state;
-	std::list<std::string> answer;
-	std::map<int, int> errors;
-
-public:
-	ResultWindow(Geometry g)
+	QuestionWindow(Geometry g)
 		: Window(g)
-		, enable_result(false)
-		, show_right_answer(true)
-	{
-		keypad(window, TRUE);
-	}
+	{}
 
 	virtual void refresh();
 
-	void enable(bool e) {
-		enable_result = e;
-		refresh();
-	}
-
-	void update(
-		Screen::CHECK_STATE state_,
-		const std::list<std::string> &answer_,
-		const std::map<int, int> &errors_)
-	{
-		state = state_;
-		answer = answer_;
-		errors = errors_;
+	void update(const Problem& p) {
+		question = p.inverted ? p.question :  p.solution;
 		refresh();
 	}
 };
 
-class MessageWindow : public Window {
-	std::string message;
+class SolutionWindow : public Window {
+	std::list<std::string> solution;
+
 public:
-	MessageWindow(Geometry g) : Window(g) {}
+	SolutionWindow(Geometry g)
+		: Window(g)
+	{}
 
 	virtual void refresh();
+
+	void show(bool e)
+	{
+		mode = e ? Mode::OUTPUT : Mode::WAIT;
+		refresh();
+	}
+
+	void update(const Problem& p)
+	{
+		solution = !p.inverted ? p.solution : p.question;
+		refresh();
+	}
+};
+
+typedef view::LANGUAGE LAN;
+
+class MessageWindow : public Window
+{
+	std::string message;
+
+	LAN language;
+
+	std::string lan_to_str() {
+		if (language == LAN::RU) return "RU";
+		if (language == LAN::EN) return "EN";
+		return std::string();
+	}
+
+public:
+	MessageWindow(Geometry g)
+		: Window(g)
+		, language(LAN::UNKNOWN)
+	{}
+
+	virtual void refresh();
+
+	void set_lan (LAN lan) {
+		language = lan;
+	}
 
 	void update(const std::string &m) {
 		message = m;

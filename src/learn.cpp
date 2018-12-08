@@ -1,4 +1,4 @@
-// learn_lan.cpp : Defines the entry point for the console application.
+// learn.cpp : Defines the entry point for the console application.
 //
 
 #include <iostream>
@@ -24,22 +24,60 @@
 #include "ncurces_screen.h"
 #include "problem.h"
 #include "parser.h"
+#include "analyzer.h"
 
-#define SHOW_HELP        "-h"  // show help
-#define NOT_SHOW_ANSWERS "-a"  // not show right answer when was mistake
-#define MIXED_MODE       "-m"  // question-answer mode mixed with answer-question mode
-#define SHOW_STATISTIC   "-s"  // show statistic
-#define REPEAT_ERRORS    "-r"  // repeat only problems, which were with errors last time
+#define SHOW_HELP          "-h"
+#define PLAY_SOLUTION      "-p"
+#define PLAY_QUESTION      "-q"
+#define MIXED_MODE         "-m"
+#define INVERT_MODE        "-i"
+#define SHOW_STATISTIC     "-s"
+#define REPEAT_ERRORS      "-r"
+#define LANGUAGE_RECOGNIZE "-l"
+#define ENTER_MODE         "-e"
+#define NUMBERS            "-n"
+
+const char * help_message =
+	"-h	show this help\n" \
+	"-p	play the solution\n" \
+	"-q	play the question\n" \
+	"-m	mixed mode, question and solution may be swapped\n" \
+	"-i	invert questions and solution, discards mixed mode (-m)\n" \
+	"-s	show statistic\n" \
+	"-r	repeat only problems, which were with errors last time\n" \
+	"-l	answer language auto-detect\n" \
+	"-e	accept answer by enter key\n" \
+	"-t	use topics\n";
 
 // todo:
 // -c - case insensetive
-// -d - recognize Deutch letters
-// copy paste
-// screen update on resize
-// all list to vector
-// -h help
-// -l auto language
-// update statistic line for current question after answer instantly
+// log
+// variants for right answer
+// grammar checking
+
+namespace {
+
+typedef view::LANGUAGE LAN;
+
+const int REPEAT_TIMES = 2;
+
+void play(const std::string& phrase)
+{
+	static char audio_play_cmd[100];
+	if (phrase.empty()) return;
+	sprintf(audio_play_cmd, "spd-say \"%s\"", phrase.c_str());
+	system(audio_play_cmd);
+}
+
+void set_system_lang(LAN language)
+{
+	if (language == LAN::RU)
+		system("setxkbmap -layout ru,us -option grp:alt_shift_toggle");
+	else if (language == LAN::EN)
+		system("setxkbmap -layout us,ru -option grp:alt_shift_toggle");
+}
+
+} // namespace
 
 int main(int argc, char* argv[])
 {
@@ -48,25 +86,20 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	std::string test_file_name(argv[1]);
-
-	bool show_right_answer = true;
-	bool mixed_mode = false;
-
-	// save all params beside first
-	std::vector<std::string> params;
-	for (int i = 2; i < argc; i++) {
-		params.push_back(argv[i]);
-	}
+	std::string problems_filename(argv[1]);
 
 	// split params on keys and values
-	std::map<std::string, std::vector<std::string> > paramsMap;
-	std::vector<std::string>::iterator it_params = params.begin();
+	std::map<std::string, std::vector<std::string> > params;
 	std::string key;
-	for(; it_params != params.end(); ++it_params) {
-		if ((*it_params)[0] == '-') {
-			key = *it_params;
-			paramsMap[key] = std::vector<std::string>();
+	for (int i = 2; i < argc; i++) {
+		std::string param = argv[i];
+		if (param[0] == '-') {
+			// split "-abc" to "-a" "-b" "-c"
+			param.erase(0, 1);
+			for (char c: param) {
+				key = "-" + std::string(1, c);
+				params[key] = std::vector<std::string>();
+			}
 			continue;
 		}
 
@@ -75,27 +108,24 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
-		paramsMap[key].push_back(*it_params);
+		params.at(key).push_back(param);
 	}
 
-	if (test_file_name == "-h" || paramsMap.find(SHOW_HELP) != paramsMap.end()) {
-		std::cout << "-h	show this help" << std::endl;
-		std::cout << "-a	not show answers" << std::endl;
-		std::cout << "-m	question-answer mode mixed with answer-question mode" << std::endl;
-		std::cout << "-s	show statistic" << std::endl;
-		std::cout << "-r	repeat only problems, which were with errors last time" << std::endl;
+	if (problems_filename == "-h" || params.find(SHOW_HELP) != params.end()) {
+		std::cout << help_message;
 		return 0;
 	}
 
-	if (paramsMap.find(NOT_SHOW_ANSWERS) != paramsMap.end())
-		show_right_answer = false;
+	bool play_solution = params.find(PLAY_SOLUTION) != params.end();
+	bool play_question = params.find(PLAY_QUESTION) != params.end();
+	bool enter_accept_mode = params.find(ENTER_MODE) != params.end();
+	bool invert_mode = params.find(INVERT_MODE) != params.end();
+	bool mixed_mode = params.find(MIXED_MODE) != params.end() && !invert_mode;
+	bool auto_language = params.find(LANGUAGE_RECOGNIZE) != params.end();
 
-	if (paramsMap.find(MIXED_MODE) != paramsMap.end())
-		mixed_mode = true;
+	std::vector<Problem> problems = Parser::load(problems_filename, params);
 
-	std::vector<Problem> problems = Parser::load(test_file_name, paramsMap);
-
-	if (paramsMap.find(SHOW_STATISTIC) != paramsMap.end()) {
+	if (params.find(SHOW_STATISTIC) != params.end()) {
 		for (std::vector<Problem>::iterator it = problems.begin(); it != problems.end(); ++it) {
 			std::cout << "? ";
 			for (auto it_q = it->question.begin(); it_q != it->question.end(); ++it_q)
@@ -107,114 +137,128 @@ int main(int argc, char* argv[])
 #endif
 			std::cout << "total_errors: " << it->total_errors << "; " ;
 			std::cout << "last_errors: " << it->last_errors << "; ";
-			std::cout << "was attempts: " << it->was_attempt_any_time_before << std::endl << std::endl;
 		}
 		return 0;
 	}
 
 	setlocale(LC_ALL, "");
 
-	std::random_device rd;  //Will be used to obtain a seed for the random number engine
-	std::mt19937 generator(rd()); //Standard mersenne_twister_engine seeded with rd()
+	std::random_device rd;  // used to obtain a seed for the random number engine
+	std::mt19937 generator(rd()); // standard mersenne_twister_engine seeded with rd()
 
 	std::vector<int> to_solve;
-	std::vector<int>::size_type solving_num;
+	int solving_num = -1, previous_solving_num = -1;
 
-	bool repeat_errors_only = paramsMap.find(REPEAT_ERRORS) != paramsMap.end();
+	bool repeat_errors_only = params.find(REPEAT_ERRORS) != params.end();
 	for (size_t i = 0; i < problems.size(); ++i) {
-		if (repeat_errors_only
-			&& problems[i].last_errors == 0
-			&& problems[i].was_attempt_any_time_before)
-		{
+		if (repeat_errors_only && problems[i].last_errors == 0)
 			continue;
-		}
+
 		to_solve.push_back(static_cast<int>(i));
 	}
 
-	view::ncurses::NScreen screen(show_right_answer);
-	int test_total_errors = 0, problems_total = to_solve.size(), problems_solved = 0;
+	view::ncurses::NScreen screen(enter_accept_mode);
+	int test_total_errors = 0, problems_solved = 0;
 
-	while (to_solve.size() != 0) {
-		std::uniform_int_distribution<> distribution (0, to_solve.size() - 1);
-		solving_num = to_solve[distribution(generator)];
-
-		std::list<std::string> question = problems[solving_num].question;
-		std::list<std::string> answer = problems[solving_num].answer;
-		if (mixed_mode) {
-			std::vector<int>::size_type mixed_random = distribution(generator);
-			if (mixed_random % 2 == 0) question.swap(answer);
-		}
-
+	auto update_statistic = [&]() {
 		view::Statistic statistic = {
-			problems_total,
+			static_cast<int>(to_solve.size()),
 			problems_solved,
 			test_total_errors,
-			problems[solving_num].repeat,
-			problems[solving_num].errors,
-			problems[solving_num].total_errors
+			problems.at(solving_num).repeat,
+			problems.at(solving_num).errors,
+			problems.at(solving_num).total_errors
 		};
+		screen.update_statistic(statistic);
+	};
 
-		view::Screen::INPUT_STATE answer_state;
-		std::list<std::string> user_answer;
-		std::map<int, int> errors;
+	analysis::EqualAnalyzer analyzer;
+	while (to_solve.size() != 0) {
+		do {
+			std::uniform_int_distribution<> distribution (0, to_solve.size() - 1);
+			solving_num = to_solve[distribution(generator)];
+		} while (to_solve.size() > 1 && solving_num == previous_solving_num);
+		previous_solving_num = solving_num;
+
+		Problem& problem = problems[solving_num];
+		if (invert_mode)
+			problem.inverted = true;
+
+		bool qa_swapped = false;
+		if (mixed_mode) {
+			std::uniform_int_distribution<> distribution (0, 1);
+			if (distribution(generator) % 2 == 0) {
+				problem.inverted = true;
+				qa_swapped = true;
+			}
+		}
+
+		view::Screen::INPUT_STATE input_state;
+		std::list<std::string> answer;
 
 		try {
-			screen.update_statistic(statistic);
-			screen.show_question(question);
-			std::tie(answer_state, user_answer) = screen.get_answer();
+			update_statistic();
+			if (auto_language) {
+				LAN language = qa_swapped ? LAN::EN : LAN::RU;
+				set_system_lang(language);
+				screen.set_language(language);
+			}
+			screen.show_problem(problem);
+			std::tie(input_state, answer) = screen.get_answer();
 		} catch(const std::exception &e) {
 			std::cerr << e.what() << std::endl;
 			return 0;
 		}
 
-		user_answer.remove("");
-
-		if (answer_state == view::Screen::INPUT_STATE::EXIT) {
-			Parser::save_statistic(problems, test_file_name);
+		if (input_state == view::Screen::INPUT_STATE::EXIT) {
+			Parser::save_statistic(problems, problems_filename);
 			return 0;
 		}
 
-		if (answer_state == view::Screen::INPUT_STATE::SKIPPED) {
+		if (input_state == view::Screen::INPUT_STATE::SKIPPED) {
 			to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
-			screen.show_result(view::Screen::CHECK_STATE::SKIPPED, answer, errors);
+			update_statistic();
+			screen.show_solution();
+			screen.show_message("Skipped, press any key to continue");
+			screen.wait_pressed_key();
 			continue;
 		}
 
-		problems[solving_num].was_attempt_any_time_before = true;
-		problems[solving_num].was_attempt_this_time = true;
+		problem.was_attempt = true;
+		analysis::Verification result = analyzer.check(problem, answer);
 
-		if (user_answer.size() != answer.size()) {
-			++test_total_errors;
-			++problems[solving_num].total_errors;
-			++problems[solving_num].errors;
-			screen.show_result(view::Screen::CHECK_STATE::LINES_NUMBER_ERROR, answer, errors);
-			continue;
-		}
-
-		errors = Parser::check_answer(user_answer, answer);
-		view::Screen::CHECK_STATE check_state;
-		if (errors.size() == 0) {
-			check_state = view::Screen::CHECK_STATE::RIGHT;
-			--problems[solving_num].repeat;
-			if (problems[solving_num].repeat == 0) {
+		if (result.state == analysis::MARK::RIGHT) {
+			--problem.repeat;
+			if (problem.repeat == 0) {
 				++problems_solved;
 				to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
 			}
 		} else {
-			check_state = view::Screen::CHECK_STATE::INVALID;
-			if (problems[solving_num].repeat < 2) ++problems[solving_num].repeat;
-			++problems[solving_num].total_errors;
-			++problems[solving_num].errors;
+			problem.repeat = REPEAT_TIMES;
+			++problem.total_errors;
+			++problem.errors;
 			++test_total_errors;
 		}
 
-		screen.show_result(check_state, answer, errors);
+		update_statistic();
+		screen.show_result(result);
+		screen.show_solution();
+		screen.show_message("Press space to play question or another key to continue");
+
+		std::string to_play;
+		if (play_question) to_play = problem.question.front();
+		if (play_solution) to_play = problem.solution.front();
+		if (!to_play.empty())
+			play(to_play);
+
+		while (screen.wait_pressed_key() == ' ')
+			play(to_play);
 	}
 
-	Parser::save_statistic(problems, test_file_name);
-
-	screen.show_result(view::Screen::CHECK_STATE::ALL_SOLVED,
-		std::list<std::string>(), std::map<int, int>());
+	Parser::save_statistic(problems, problems_filename);
+	update_statistic();
+	screen.show_message("All problems solved, press eny key to exit");
+	screen.wait_pressed_key();
 	return 0;
 }
 
