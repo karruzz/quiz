@@ -12,12 +12,12 @@ class Parser
 {
 public:
 	static std::vector<Problem> load(
-			const boost::filesystem::path &path,
-			std::map<std::string, std::vector<std::string> > params);
+			const boost::filesystem::path& path,
+			const std::map<std::string, std::vector<std::string> >& params);
 
 	static void save_statistic(
-			const std::vector<Problem> &problems,
-			const boost::filesystem::path &path);
+			const std::vector<Problem>& problems,
+			const boost::filesystem::path& path);
 };
 
 #endif // PARSER_H

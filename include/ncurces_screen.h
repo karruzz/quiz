@@ -39,15 +39,7 @@ private:
 	std::unique_ptr<MessageWindow>   window_message;
 	std::unique_ptr<AnswerWindow>    window_answer;
 
-	Geometry geometry_statistic;
-	Geometry geometry_question;
-	Geometry geometry_answer;
-	Geometry geometry_solution;
-	Geometry geometry_message;
-
-	// for update
-	void resize_handle();
-	void update_geometry();
+	void resize();
 
 	Statistic current_statistic;
 	Problem current_problem;

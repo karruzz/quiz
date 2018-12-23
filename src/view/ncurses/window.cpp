@@ -6,19 +6,6 @@ namespace ncurses {
 
 #define SERVICE_COLOR YELLOW
 
-Window::Window(const Geometry &g)
-	: mode(Mode::WAIT)
-{
-	geometry = g;
-	create();
-	clear();
-}
-
-Window::~Window()
-{
-	remove();
-}
-
 void Window::create()
 {
 	window = newwin(geometry.h, geometry.w, geometry.y, geometry.x);
@@ -28,7 +15,9 @@ void Window::create()
 
 void Window::remove()
 {
+	if (!window) return;
 	delwin(window);
+	window = NULL;
 }
 
 void Window::clear()
@@ -99,11 +88,11 @@ void QuestionWindow::refresh()
 void SolutionWindow::refresh()
 {
 	clear();
-	if (mode != Mode::OUTPUT) return;
+	if (!visible) return;
 
-	int line = 0;
+	int y = 0;
 	for (const std::string s: solution)
-		mvwaddstr(window, line++, 0, s.c_str());
+		mvwaddstr(window, y++, 0, s.c_str());
 
 	wrefresh(window);
 }
@@ -136,20 +125,29 @@ void AnswerWindow::update_screen()
 		};
 
 		for (auto line_it = verification.answer.begin()
-			 ; line_it != verification.answer.end(); ++line_it, ++y) {
-			const auto error_it = verification.errors.find(y);
-			if (error_it != verification.errors.end()) {
-				size_t error_since_sym = static_cast<size_t>(error_it->second);
-				if (error_since_sym < line_it->size()) {
-					mvwaddstr(window, y, 0, line_it->substr(0, error_since_sym).c_str());
-					waddstr_colored(line_it->substr(error_since_sym), RED_BKGR);
-				} else {
-					mvwaddstr(window, y, 0, line_it->c_str());
-					waddstr_colored(" ", RED_BKGR);
+			; line_it != verification.answer.end(); ++line_it, ++y) {
+			std::string line = *line_it;
+
+			mvwaddstr(window, y, 0, line.c_str());
+			const auto errors_map_it = verification.errors.find(y);
+			if (errors_map_it != verification.errors.end()) {
+				const std::map<int, int>& errors_map = errors_map_it->second;
+				for (auto errors_it = errors_map.cbegin(); errors_it != errors_map.cend(); ++errors_it) {
+					int x = errors_it->first;
+					int len = errors_it->second;
+					std::string error_sub = line.substr(x, len);
+					mvwaddstr_colored(y, x, error_sub.c_str(), RED_BKGR);
 				}
-				continue;
+
+//				size_t error_since_sym = static_cast<size_t>(error_it->second);
+//				if (error_since_sym < line_it->size()) {
+//					mvwaddstr(window, y, 0, line_it->substr(0, error_since_sym).c_str());
+//					waddstr_colored(line_it->substr(error_since_sym), RED_BKGR);
+//				} else {
+//					mvwaddstr(window, y, 0, line_it->c_str());
+//					waddstr_colored(" ", RED_BKGR);
+//				}
 			}
-			mvwaddstr(window, y, 0, line_it->c_str());
 		}
 
 		++y;
@@ -159,6 +157,8 @@ void AnswerWindow::update_screen()
 			mvwaddstr_colored(y, 0, "[invalid lines amount]", SERVICE_COLOR);
 		} else if (verification.state == analysis::MARK::ERROR) {
 			mvwaddstr_colored(y, 0, "[invalid answer]", SERVICE_COLOR);
+		} else if (verification.state == analysis::MARK::NOT_FULL_ANSWER) {
+			mvwaddstr_colored(y, 0, "[not full answer]", SERVICE_COLOR);
 		}
 	}
 }

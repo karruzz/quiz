@@ -46,37 +46,27 @@ NScreen::NScreen(bool enter_accept_mode)
 	init_pair(COLOR::RED_BKGR, COLOR_LIGHT_WHITE, COLOR_RED);
 	init_pair(BKGR, COLOR_LIGHT_WHITE, COLOR_GRAY);
 
-	update_geometry();
-	window_statistic = std::unique_ptr<StatisticWindow>(new StatisticWindow(geometry_statistic));
-	window_question = std::unique_ptr<QuestionWindow>(new QuestionWindow(geometry_question));
-	window_answer = std::unique_ptr<AnswerWindow>(
-		new AnswerWindow(geometry_answer, std::bind(&NScreen::resize_handle, this), TAB_SIZE));
-	window_solution = std::unique_ptr<SolutionWindow>(new SolutionWindow(geometry_solution));
-	window_message = std::unique_ptr<MessageWindow>(new MessageWindow(geometry_message));
-//	resize_handle();
+	window_statistic.reset(new StatisticWindow());
+	window_question.reset(new QuestionWindow());
+	window_answer.reset(new AnswerWindow(std::bind(&NScreen::resize, this), TAB_SIZE));
+	window_solution.reset(new SolutionWindow());
+	window_message.reset(new MessageWindow());
+
+	resize();
 }
 
-void NScreen::update_geometry() {
+void NScreen::resize()
+{
 	const int statistic_h = 2, message_h = 1;
 	int ques_h = (LINES - statistic_h - message_h) * 2 / 7;
 	int answ_h = (LINES - statistic_h - ques_h - message_h) / 2;
 	int resl_h =  LINES - statistic_h - ques_h - message_h - answ_h;
 
-	geometry_statistic = Geometry { .x = 0, .y = 0, .w = COLS, .h = statistic_h };
-	geometry_question = Geometry { .x = 0, .y = statistic_h, .w = COLS, .h = ques_h };
-	geometry_answer = Geometry { .x = 0, .y = statistic_h  + ques_h, .w = COLS, .h = answ_h };
-	geometry_solution = Geometry { .x = 0, .y = statistic_h + ques_h + answ_h, .w = COLS, .h = resl_h };
-	geometry_message = Geometry { .x = 0, .y = statistic_h + ques_h + answ_h + resl_h, .w = COLS, .h = message_h };
-}
-
-void NScreen::resize_handle()
-{
-	update_geometry();
-	window_statistic->resize(geometry_statistic);
-	window_question->resize(geometry_question);
-	window_answer->resize(geometry_answer);
-	window_solution->resize(geometry_solution);
-	window_message->resize(geometry_message);
+	window_statistic->resize({ .x = 0, .y = 0, .w = COLS, .h = statistic_h });
+	window_question->resize({ .x = 0, .y = statistic_h, .w = COLS, .h = ques_h });
+	window_answer->resize({ .x = 0, .y = statistic_h  + ques_h, .w = COLS, .h = answ_h });
+	window_solution->resize({ .x = 0, .y = statistic_h + ques_h + answ_h, .w = COLS, .h = resl_h });
+	window_message->resize({ .x = 0, .y = statistic_h + ques_h + answ_h + resl_h, .w = COLS, .h = message_h });
 
 	window_answer->focus(true);
 }
@@ -88,9 +78,7 @@ NScreen::~NScreen()
 
 void NScreen::update_statistic(const Statistic &s)
 {
-	window_statistic->update_statistic(s);
-	if (s.left_problems == 0)
-		window_message->update("[All problems have been solved]");
+	window_statistic->update(s);
 }
 
 void NScreen::show_problem(const Problem& problem)

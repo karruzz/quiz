@@ -50,10 +50,9 @@ const char * help_message =
 	"-t	use topics\n";
 
 // todo:
-// -c - case insensetive
+// -c - case insensetive == grammar analyzer
 // log
 // variants for right answer
-// grammar checking
 
 namespace {
 

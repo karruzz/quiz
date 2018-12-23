@@ -2,6 +2,7 @@
 #include <sstream>
 #include <fstream>
 #include <map>
+#include <set>
 #include <numeric>
 #include <functional>
 
@@ -11,7 +12,6 @@
 
 #define USE_TOPICS "-t"
 #define NUMBERS    "-n"
-#define TRIM_TYPE(line) line.erase(0, 1);
 
 namespace {
 
@@ -42,7 +42,7 @@ enum line_type {
 	LINE_EMPTY,
 	LINE_NO_TYPE,  // no type at 0 character
 	LINE_QUESTION,
-	LINE_TAG,
+	LINE_TAG, // deprecated
 	LINE_TOPIC,
 	LINE_BLOCK
 };
@@ -84,19 +84,30 @@ int is_space_not_tab(int c) {
 	return static_cast<int>(std::isspace(c) && c != '\t');
 }
 
-inline void ltrim(std::string &s) {
+void ltrim(std::string &s) {
 	s.erase(s.begin(), std::find_if(s.begin(), s.end(),
 			std::not1(std::ptr_fun<int, int>(is_space_not_tab))));
 }
 
-inline void rtrim(std::string &s) {
+void rtrim(std::string &s) {
 	s.erase(std::find_if(s.rbegin(), s.rend(),
 			std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
 }
 
-inline void trim_spaces(std::string &s) {
+void trim_spaces(std::string &s) {
 	ltrim(s);
 	rtrim(s);
+}
+
+void trim_type(std::string& s) {
+	s.erase(0, 1);
+}
+
+void remove_duplicate_space(std::string& s)
+{
+	static auto adjacent_spaces =
+		[](char lhs, char rhs) { return (rhs == ' ') && (lhs == ' '); };
+	s.erase(std::unique(s.begin(), s.end(), adjacent_spaces), s.end());
 }
 
 }
@@ -123,7 +134,7 @@ std::map<size_t, Statistic> load_statistic(const boost::filesystem::path &lrn_fi
 			continue;
 
 		char line_type = line.at(0);
-		TRIM_TYPE(line);
+		trim_type(line);
 		trim_spaces(line);
 
 		if (line_type == HASH) {
@@ -141,8 +152,7 @@ std::map<size_t, Statistic> load_statistic(const boost::filesystem::path &lrn_fi
 			if (tag_ss >> question_hash) {
 #ifdef DEBUG
 				std::cout << "line: " << question_hash_line << "; hash: " << question_hash;
-				std::cout << "; total: " << total_errors << "; last: " << last_errors;
-				std::cout << "; was attempts: " << was_attempt << std::endl;
+				std::cout << "; total: " << total_errors << "; last: " << last_errors << std::endl;
 #endif
 				result.insert(std::pair<size_t, Statistic>(
 					question_hash, Statistic(question_hash, total_errors, last_errors)));
@@ -187,92 +197,79 @@ void Parser::save_statistic(const std::vector<Problem> &problems, const boost::f
 }
 
 std::vector<Problem> Parser::load(
-		const boost::filesystem::path &lrn_file_path,
-		std::map<std::string, std::vector<std::string> > params)
+		const boost::filesystem::path &quiz_path,
+		const std::map<std::string, std::vector<std::string> >& params)
 {
 	std::vector<Problem> problems;
 	std::map<std::string, std::list<std::string>> repeat_blocks;
 
-	if (!boost::filesystem::exists(lrn_file_path) || !boost::filesystem::is_regular_file(lrn_file_path))
+	if (!boost::filesystem::exists(quiz_path) || !boost::filesystem::is_regular_file(quiz_path))
 		return problems;
 
-	std::ifstream lrn_file_ifstream(lrn_file_path.string());
-	if (!lrn_file_ifstream.is_open())
+	std::ifstream quiz_ifstream(quiz_path.string());
+	if (!quiz_ifstream.is_open())
 		return problems;
 
 	bool use_topics = params.find(USE_TOPICS) != params.end();
+	bool needed_topic = false;
+	std::set<std::string> topics;
+	if (use_topics) {
+		auto from_params = params.at(USE_TOPICS);
+		std::copy(from_params.begin(), from_params.end(), std::inserter(topics, topics.begin()));
+	}
+
 	bool definite_numbers = params.find(NUMBERS) != params.end();
-	bool desired_topic = false;
 	parse_state prev_state = STATE_NONE, state = STATE_NONE;
 	std::string line, block_name;
 	std::list<std::string> quest, solut, block;
-	int line_num = -1, question_number = -1, questions_loaded = 0;
+	int question_number = -1, questions_loaded = 0;
 	int question_start = -1, question_max = -1, question_step = -1;
 	if (definite_numbers) {
 		question_start = std::stoi(params.at(NUMBERS).at(0));
 		question_max = std::stoi(params.at(NUMBERS).at(1));
 		question_step = std::stoi(params.at(NUMBERS).at(2));
 	}
-	while (std::getline(lrn_file_ifstream, line)) {
+	while (std::getline(quiz_ifstream, line)) {
 		prev_state = state;
-		line_num++;
 		line_type t = get_line_type(line);
 
-		if (t == LINE_TOPIC) {
-			if (!use_topics)
-				continue;
+		if (t == LINE_EMPTY || t == LINE_COMMENT || t == LINE_TAG)
+			continue;
 
-			std::string topic = line.substr(1);
-			trim_spaces(topic);
-			std::vector<std::string>& desired_topics = params[USE_TOPICS];
-			desired_topic =
-				std::find(desired_topics.begin(), desired_topics.end(), topic) != desired_topics.end();
+		// prepare line
+		if (t != LINE_NO_TYPE) trim_type(line);
+		trim_spaces(line);
+		remove_duplicate_space(line);
+
+		if (t == LINE_TOPIC) {
+			needed_topic = use_topics && topics.find(line) != topics.end();
+			continue;
+		} else if (t == LINE_SOLUTION) {
+			state = STATE_SOLUTION_PREPARING;
+		} else if (t == LINE_QUESTION) {
+			state = STATE_QUESTION_PREPARING;
+		} else if (t == LINE_BLOCK) {
+			state = STATE_BLOCK_PREPARING;
+			block_name = line;
 			continue;
 		}
 
-		switch (t) {
-			case (LINE_EMPTY) :
-			case (LINE_COMMENT) :
-			case (LINE_TAG):
-				continue;
-			case (LINE_NO_TYPE):
-				break;
-			case (LINE_SOLUTION) :
-				state = STATE_SOLUTION_PREPARING;
-				TRIM_TYPE(line);
-				break;
-			case (LINE_QUESTION) :
-				state = STATE_QUESTION_PREPARING;
-				TRIM_TYPE(line);
-				break;
-			case (LINE_BLOCK) :
-				state = STATE_BLOCK_PREPARING;
-				TRIM_TYPE(line);
-				break;
-			default:
-				break;
-		}
-
-		trim_spaces(line);
-
 		bool state_changed = state != prev_state;
 
+		// flush block
 		if (state_changed && prev_state == STATE_BLOCK_PREPARING) {
 			repeat_blocks.insert(std::pair<std::string, std::list<std::string>>(block_name, block));
-			block_name.clear();
 			block.clear();
 		}
 
 		if (state == STATE_BLOCK_PREPARING) {
-			if (block_name.empty())
-				block_name = line;
-			else
-				block.push_back(line);
+			block.push_back(line);
 		}
 
-		if (use_topics && !desired_topic)
+		if (use_topics && !needed_topic)
 			continue;
 
+		// flush problem
 		if (state_changed && prev_state == STATE_SOLUTION_PREPARING) {
 			if (quest.size() > 0 && solut.size() > 0) {
 				++question_number;
@@ -302,15 +299,10 @@ std::vector<Problem> Parser::load(
 
 			if (block_start != std::string::npos && block_end != std::string::npos) {
 				std::string block_name = line.substr(block_start + 2, block_end - (block_start + 2));
-				auto it = repeat_blocks.find(block_name);
-				if (it != repeat_blocks.end())
-					quest.insert(quest.end(), it->second.begin(), it->second.end());
-				else
-					quest.push_back(line);
+				auto repeat_block = repeat_blocks.at(block_name);
+				quest.insert(quest.end(), repeat_block.begin(), repeat_block.end());
 			} else
 				quest.push_back(line);
-		} else if (state == STATE_QUESTION_PREPARING) {
-			quest.push_back(line);
 		}
 	}
 
@@ -325,14 +317,14 @@ std::vector<Problem> Parser::load(
 		}
 	}
 
-	lrn_file_ifstream.close();
+	quiz_ifstream.close();
 
 	for (auto it = problems.begin(); it != problems.end(); ++it) {
 		std::string s = std::accumulate(it->question.begin(), it->question.end(), std::string(""));
 		it->question_hash = std::hash<std::string>()(s);
 	}
 
-	std::map<size_t, Statistic> stat = load_statistic(lrn_file_path);
+	std::map<size_t, Statistic> stat = load_statistic(quiz_path);
 
 	for (auto it = problems.begin(); it != problems.end(); ++it) {
 		std::map<size_t, Statistic>::iterator mit = stat.find(it->question_hash);

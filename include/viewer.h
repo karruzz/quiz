@@ -34,8 +34,7 @@ public:
 		ENTERED,
 		SKIPPED,
 		EXIT,
-		NEXT,
-		PLAY
+		NEXT
 	};
 
 	virtual ~Screen() { }
@@ -49,22 +48,6 @@ public:
 	virtual void show_result(const analysis::Verification&) = 0;
 	virtual void show_solution() = 0;
 	virtual void show_message(const std::string& s) = 0;
-};
-
-class Viewer {
-public:
-	enum color {
-		RED = 31,
-		GREEN = 32,
-		YELLOW = 33,
-		BLUE = 34,
-		MAGNETTA = 35,
-		CYAN = 36,
-		RED_BACKGROUND = 41,
-	};
-
-	static void clear_screen();
-	static void colored_line_output(const std::string& s, Viewer::color c, bool new_line = true);
 };
 
 } // namespace view

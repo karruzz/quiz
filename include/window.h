@@ -14,15 +14,17 @@ namespace view {
 
 namespace ncurses {
 
+typedef view::LANGUAGE LAN;
+
 enum COLOR {
-	RED = 1,
-	GREEN,
-	YELLOW,
-	BLUE,
-	MAGENTA,
+	BLUE = 1,
+	BKGR,
 	CYAN,
+	GREEN,
+	MAGENTA,
+	RED,
 	RED_BKGR,
-	BKGR
+	YELLOW
 };
 
 struct Point {
@@ -37,14 +39,17 @@ class Window
 {
 protected:
 	enum class Mode {
-		WAIT,
-		INPUT,
-		OUTPUT
+		WAIT, INPUT, OUTPUT
 	};
 
-	Mode mode;
-	WINDOW *window;
-	Geometry geometry;
+//	Window();
+	~Window() {
+		remove();
+	}
+
+	Mode mode = Mode::WAIT;
+	WINDOW *window = NULL;
+	Geometry geometry = { -1 , -1 , -1 , -1 };
 
 	void create();
 	void remove();
@@ -52,9 +57,6 @@ protected:
 	void waddstr_colored(const std::string &s, int color_scheme);
 
 public:
-	Window(const Geometry &g);
-	virtual ~Window();
-
 	virtual void clear();
 	virtual void refresh();
 	virtual void resize(const Geometry g);
@@ -71,9 +73,8 @@ protected:
 	void update_cursor(Point position) { cursor = position; }
 
 public:
-	CursorWindow(const Geometry &g, const std::function<void()>& resize)
-		: Window(g)
-		, resize_handle(resize)
+	CursorWindow(const std::function<void()>& resize)
+		: resize_handle(resize)
 	{}
 
 	void focus(bool enable, bool show_cursor = true) {
@@ -85,8 +86,7 @@ public:
 		wmove(window, cursor.y, cursor.x);
 	}
 
-	int get_key()
-	{
+	int get_key() {
 		for (;;) {
 			int key = wgetch(window);
 			if (key == ERR)
@@ -102,19 +102,20 @@ public:
 class AnswerWindow : public CursorWindow
 {
 	AudioRecord audio_record;
-	std::unique_ptr<Editor> editor;
 	int tab_size;
-//	std::map<int, std::list<int>> errors;
+	std::unique_ptr<Editor> editor;
 
 	analysis::Verification verification;
 
 	void update_screen();
 	void update_line();
+
 public:
-	AnswerWindow(const Geometry &g, const std::function<void()>& resize, int tab_size_)
-		: CursorWindow(g, resize)
+	AnswerWindow(const std::function<void()>& resize, int tab_size_)
+		: CursorWindow(resize)
 		, tab_size(tab_size_)
-	{ }
+		, editor(new Editor(tab_size))
+	{}
 
 	virtual void refresh();
 	void key_process(int ch);
@@ -124,60 +125,50 @@ public:
 	void show_analysed(const analysis::Verification& v);
 };
 
-class StatisticWindow : public Window {
+class StatisticWindow : public Window
+{
 	Statistic statistic;
-public:
-	StatisticWindow(Geometry g)
-		: Window(g)
-	{}
 
+public:
 	virtual void refresh();
 
-	void update_statistic(Statistic s) {
+	void update(Statistic s) {
 		statistic = s;
 		refresh();
 	}
 };
 
-class QuestionWindow : public Window {
+class QuestionWindow : public Window
+{
 	std::list<std::string> question;
-public:
-	QuestionWindow(Geometry g)
-		: Window(g)
-	{}
 
+public:
 	virtual void refresh();
 
 	void update(const Problem& p) {
-		question = p.inverted ? p.question :  p.solution;
+		question = !p.inverted ? p.question :  p.solution;
 		refresh();
 	}
 };
 
-class SolutionWindow : public Window {
+class SolutionWindow : public Window
+{
 	std::list<std::string> solution;
+	bool visible = false;
 
 public:
-	SolutionWindow(Geometry g)
-		: Window(g)
-	{}
-
 	virtual void refresh();
 
-	void show(bool e)
-	{
-		mode = e ? Mode::OUTPUT : Mode::WAIT;
+	void show(bool e) {
+		visible = e;
 		refresh();
 	}
 
-	void update(const Problem& p)
-	{
+	void update(const Problem& p) {
 		solution = !p.inverted ? p.solution : p.question;
 		refresh();
 	}
 };
-
-typedef view::LANGUAGE LAN;
 
 class MessageWindow : public Window
 {
@@ -192,11 +183,6 @@ class MessageWindow : public Window
 	}
 
 public:
-	MessageWindow(Geometry g)
-		: Window(g)
-		, language(LAN::UNKNOWN)
-	{}
-
 	virtual void refresh();
 
 	void set_lan (LAN lan) {
