@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 		screen.update_statistic(statistic);
 	};
 
-	analysis::EqualAnalyzer analyzer;
+	analysis::Analyzer analyzer;
 	while (to_solve.size() != 0) {
 		do {
 			std::uniform_int_distribution<> distribution (0, to_solve.size() - 1);

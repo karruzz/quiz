@@ -9,6 +9,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "parser.h"
+#include <utils.h>
 
 #define USE_TOPICS "-t"
 #define NUMBERS    "-n"
@@ -79,35 +80,9 @@ struct Statistic {
 	}
 };
 
-
-int is_space_not_tab(int c) {
-	return static_cast<int>(std::isspace(c) && c != '\t');
-}
-
-void ltrim(std::string &s) {
-	s.erase(s.begin(), std::find_if(s.begin(), s.end(),
-			std::not1(std::ptr_fun<int, int>(is_space_not_tab))));
-}
-
-void rtrim(std::string &s) {
-	s.erase(std::find_if(s.rbegin(), s.rend(),
-			std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-}
-
-void trim_spaces(std::string &s) {
-	ltrim(s);
-	rtrim(s);
-}
-
-void trim_type(std::string& s) {
-	s.erase(0, 1);
-}
-
-void remove_duplicate_space(std::string& s)
+void trim_type(std::string& s)
 {
-	static auto adjacent_spaces =
-		[](char lhs, char rhs) { return (rhs == ' ') && (lhs == ' '); };
-	s.erase(std::unique(s.begin(), s.end(), adjacent_spaces), s.end());
+	s.erase(0, 1);
 }
 
 }
@@ -239,7 +214,7 @@ std::vector<Problem> Parser::load(
 		// prepare line
 		if (t != LINE_NO_TYPE) trim_type(line);
 		trim_spaces(line);
-		remove_duplicate_space(line);
+		remove_duplicate_spaces(line);
 
 		if (t == LINE_TOPIC) {
 			needed_topic = use_topics && topics.find(line) != topics.end();

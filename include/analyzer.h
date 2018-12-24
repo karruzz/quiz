@@ -25,8 +25,8 @@ struct Verification
 	std::list<std::string> solution;
 
 	MARK state;
-	// <line, <position_in_line, length>>
-	std::map<int, std::map<int, int>> errors;
+	// <line, <position_on_screen, string>>
+	std::map<int, std::map<int, std::string>> errors;
 
 	Verification(const Problem& p, const std::list<std::string>& a)
 		: problem(p)
@@ -40,24 +40,12 @@ struct Verification
 	Verification& operator= (const Verification& v) = default;
 };
 
-class BaseAnalyzer
+class Analyzer
 {
 public:
-	virtual Verification check(const Problem& problem, const std::list<std::string>& answer);
-};
-
-class EqualAnalyzer : BaseAnalyzer
-{
-public:
-	virtual Verification check(const Problem& problem, const std::list<std::string>& answer);
-};
-
-class GrammarAnalyzer : BaseAnalyzer
-{
-public:
-	virtual Verification check(const Problem& problem, const std::list<std::string>& answer);
+	Verification check(const Problem& problem, const std::list<std::string>& answer);
 };
 
 } // namespace analyze
 
-#endif
+#endif // ANALYZER_H

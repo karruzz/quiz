@@ -5,7 +5,7 @@ INCLUDES = -Iinclude -I/usr/include/pocketsphinx -I/usr/include/x86_64-linux-gnu
 BIN_DIR = bin
 BUILD_DIR = build
 LIBS = -lboost_filesystem -lboost_system -lncursesw -lpocketsphinx -lsphinxbase -lsphinxad
-SOURCES = src/learn.cpp src/parser.cpp src/analyzer.cpp src/voice.cpp src/view/ncurses/ncurses_screen.cpp src/view/ncurses/window.cpp src/view/ncurses/editor.cpp
+SOURCES = src/learn.cpp src/parser.cpp src/analyzer.cpp src/voice.cpp src/view/ncurses/ncurses_screen.cpp src/view/ncurses/window.cpp src/view/ncurses/editor.cpp src/utils.cpp
 
 dir_guard=@mkdir -p $(@D)
 

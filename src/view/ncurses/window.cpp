@@ -131,12 +131,9 @@ void AnswerWindow::update_screen()
 			mvwaddstr(window, y, 0, line.c_str());
 			const auto errors_map_it = verification.errors.find(y);
 			if (errors_map_it != verification.errors.end()) {
-				const std::map<int, int>& errors_map = errors_map_it->second;
+				const std::map<int, std::string>& errors_map = errors_map_it->second;
 				for (auto errors_it = errors_map.cbegin(); errors_it != errors_map.cend(); ++errors_it) {
-					int x = errors_it->first;
-					int len = errors_it->second;
-					std::string error_sub = line.substr(x, len);
-					mvwaddstr_colored(y, x, error_sub.c_str(), RED_BKGR);
+					mvwaddstr_colored(y, errors_it->first, errors_it->second.c_str(), RED_BKGR);
 				}
 
 //				size_t error_since_sym = static_cast<size_t>(error_it->second);
