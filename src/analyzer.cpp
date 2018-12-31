@@ -2,9 +2,6 @@
 #include <set>
 #include <vector>
 
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
-
 #include <analyzer.h>
 #include <utils.h>
 
@@ -14,52 +11,52 @@ namespace {
 
 struct Lexem
 {
-	enum TYPE {
-		UNDEF = 0,
+	enum WHAT {
+		UNDEF,
 		WORD,
 		SPACE,
 		PUNCT
 	};
 
-	TYPE what;
-	std::string str;
+	WHAT what;
+	std::u16string str;
 	size_t pos;
-	size_t length;
 };
+
 
 std::vector<Lexem> split_to_lexemes(const std::string& s)
 {
-	static const std::set<std::string> space_lexems = { " ", "\t" };
-	static const std::set<std::string> punctuate_lexems
-		= { ",", ".", "?", "!", "-", ":", ";", "_", "(", ")", "[", "]", "<", ">", "{", "}", "+", "-", "=", "*", "/" };
-	std::vector<std::string> tokens = utf8_split(s);
+	static const std::set<char16_t> space_lexems = { ' ', '\t' };
+	static const std::set<char16_t> punctuate_lexems
+		= { ',', '.', '?', '!', '-', ':', ';', '_', '(', ')',
+			'[', ']', '<', '>', '{', '}', '+', '-', '=', '*', '/' };
+
 	std::vector<Lexem> lexemes;
-	std::string lexem;
+	std::u16string lexem;
 	size_t position = 0;
-	Lexem::TYPE prev_lexem_type = Lexem::TYPE::UNDEF, lexem_type = Lexem::TYPE::UNDEF;
+	Lexem::WHAT prev_lexem_type = Lexem::UNDEF, lexem_type = Lexem::UNDEF;
 
 	auto try_to_flush_lexem = [&]() {
-		if (prev_lexem_type != Lexem::TYPE::UNDEF && prev_lexem_type != lexem_type) {
-			size_t length = utf8_length(lexem);
-			lexemes.push_back({ lexem_type, lexem, position, length });
-			position += length;
+		if (prev_lexem_type != Lexem::UNDEF && prev_lexem_type != lexem_type) {
+			lexemes.push_back({ lexem_type, lexem, position});
+			position += lexem.length();
 			lexem.clear();
 		}
 	};
 
-	for (const std::string& t: tokens) {
-		if (space_lexems.find(t) != space_lexems.end()) {
+	for (const char16_t& c: to_utf16(s)) {
+		if (space_lexems.find(c) != space_lexems.end()) {
 			lexem_type = Lexem::SPACE;
 			try_to_flush_lexem();
-			lexem = t;
-		} else if (punctuate_lexems.find(t) != punctuate_lexems.end()) {
+			lexem = c;
+		} else if (punctuate_lexems.find(c) != punctuate_lexems.end()) {
 			lexem_type = Lexem::PUNCT;
 			try_to_flush_lexem();
-			lexem = t;
+			lexem = c;
 		} else {
 			lexem_type = Lexem::WORD;
 			try_to_flush_lexem();
-			lexem.append(t);
+			lexem.push_back(c);
 		}
 
 		prev_lexem_type = lexem_type;
@@ -67,7 +64,7 @@ std::vector<Lexem> split_to_lexemes(const std::string& s)
 
 	// final lexem
 	if (!lexem.empty())
-		lexemes.push_back({ lexem_type, lexem, position, utf8_length(lexem) });
+		lexemes.push_back({ lexem_type, lexem, position });
 
 	return lexemes;
 }
@@ -75,7 +72,7 @@ std::vector<Lexem> split_to_lexemes(const std::string& s)
 } // namespace
 
 Verification Analyzer::check(
-		const Problem& problem, const std::list<std::string>& answer)
+	const Problem& problem, const std::list<std::string>& answer, Analyzer::OPTIONS flags)
 {
 	Verification v(problem, answer);
 	v.answer.remove("");
@@ -88,39 +85,60 @@ Verification Analyzer::check(
 	std::for_each(v.answer.begin(), v.answer.end(), remove_duplicate_spaces);
 
 	int line_num = 0;
-	auto answr_line_it = v.answer.cbegin();
-	auto solut_line_it = v.solution.cbegin();
-	for (; answr_line_it != v.answer.cend() && solut_line_it != v.solution.cend()
-		 ; ++answr_line_it, ++solut_line_it, ++line_num)
+	auto answr_line = v.answer.cbegin();
+	auto solut_line = v.solution.cbegin();
+	for (; answr_line != v.answer.cend() && solut_line != v.solution.cend()
+		 ; ++answr_line, ++solut_line, ++line_num)
 	{
-		auto answr_lexems = split_to_lexemes(*answr_line_it);
-		auto solut_lexems = split_to_lexemes(*solut_line_it);
+		auto answr_lexems = split_to_lexemes(*answr_line);
+		auto solut_lexems = split_to_lexemes(*solut_line);
 
-		auto answr_lexems_it = answr_lexems.cbegin();
-		auto solut_lexems_it = solut_lexems.cbegin();
-		for (; answr_lexems_it != answr_lexems.cend() && solut_lexems_it != solut_lexems.cend()
-			 ; ++answr_lexems_it, ++solut_lexems_it)
+		auto answr_lexem = answr_lexems.cbegin();
+		auto solut_lexem = solut_lexems.cbegin();
+		for (; answr_lexem != answr_lexems.cend() && solut_lexem != solut_lexems.cend()
+			 ; ++answr_lexem, ++solut_lexem)
 		{
-			if (answr_lexems_it->str != solut_lexems_it->str) {
-				v.errors[line_num].insert(std::pair<int, std::string>(answr_lexems_it->pos, answr_lexems_it->str));
-				v.state = MARK::ERROR;
-				break;
+			std::u16string answr = answr_lexem->str;
+			std::u16string solut = solut_lexem->str;
+			std::u16string str = answr_lexem->str;
+			size_t pos = answr_lexem->pos;
+
+			if (flags & OPTIONS::CASE_INSENSITIVE) {
+				to_lower(answr);
+				to_lower(solut);
+			}
+
+			if (answr != solut) {
+				v.errors[line_num].push_back({Error::ERROR_LEXEM, str, pos});
+
+				for (size_t i = 0; i < answr.size() && i < solut.size(); ++i)
+					if (answr.at(i) != solut.at(i)) {
+						v.errors[line_num].push_back(
+							{Error::ERROR_SYMBOL, std::u16string(1, str.at(i)), pos + i});
+					}
+
+				// different length
+				if (solut.size() < answr.size())
+					v.errors[line_num].push_back(
+						{Error::ERROR_SYMBOL, str.substr(solut.size()), pos + solut.size()});
+
+				v.state |= MARK::ERROR;
 			}
 		}
 
-		if (v.state != MARK::ERROR) {
-			// not full answer
-			if (solut_lexems_it != solut_lexems.cend()) {
-				v.errors[line_num].insert(std::pair<int, std::string>(utf8_length(*answr_line_it), "..."));
-				v.state = MARK::NOT_FULL_ANSWER;
-			}
+		// not full answer
+		if (solut_lexem != solut_lexems.cend()) {
+			v.errors[line_num].push_back(
+				{Error::ERROR_SYMBOL, to_utf16("..."), to_utf16(*answr_line).size()});
+			v.state |= MARK::NOT_FULL_ANSWER;
+		}
 
-			// redundant answer
-			if (answr_lexems_it != answr_lexems.cend()) {
-				for (; answr_lexems_it != answr_lexems.cend(); ++answr_lexems_it) {
-					v.errors[line_num].insert(std::pair<int, std::string>(answr_lexems_it->pos, answr_lexems_it->str));
-				}
-			}
+		// redundant answer
+		if (answr_lexem != answr_lexems.cend()) {
+			for (; answr_lexem != answr_lexems.cend(); ++answr_lexem)
+				v.errors[line_num].push_back(
+					{Error::ERROR_SYMBOL, answr_lexem->str, answr_lexem->pos});
+			v.state |= MARK::REDUNDANT_ANSWER;
 		}
 	}
 

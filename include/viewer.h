@@ -33,8 +33,7 @@ public:
 	enum class INPUT_STATE {
 		ENTERED,
 		SKIPPED,
-		EXIT,
-		NEXT
+		EXIT
 	};
 
 	virtual ~Screen() { }

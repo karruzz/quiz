@@ -1,4 +1,6 @@
 #include <window.h>
+#include <utils.h>
+#include <analyzer.h>
 
 namespace view {
 
@@ -9,8 +11,8 @@ namespace ncurses {
 void Window::create()
 {
 	window = newwin(geometry.h, geometry.w, geometry.y, geometry.x);
-	wattron(window, COLOR_PAIR(BKGR));
-	wbkgd(window, COLOR_PAIR(BKGR));
+	wattron(window, COLOR_PAIR(WHITE));
+	wbkgd(window, COLOR_PAIR(WHITE));
 }
 
 void Window::remove()
@@ -31,11 +33,13 @@ void Window::clear()
 	wrefresh(window);
 }
 
-void Window::waddstr_colored(const std::string &s, int color_scheme)
+void Window::waddstr_colored(const std::string &s, int color_scheme, bool bold)
 {
+	if (bold) wattron(window, A_BOLD);
 	wattron(window, COLOR_PAIR(color_scheme));
 	waddstr(window, s.c_str());
 	wattroff(window, COLOR_PAIR(color_scheme));
+	if (bold) wattroff(window, A_BOLD);
 }
 
 void Window::refresh()
@@ -79,7 +83,7 @@ void QuestionWindow::refresh()
 	clear();
 
 	int y = 0;
-	for (const std::string s: question)
+	for (const std::string& s: question)
 		mvwaddstr(window, y++, 0, s.c_str());
 
 	wrefresh(window);
@@ -91,7 +95,7 @@ void SolutionWindow::refresh()
 	if (!visible) return;
 
 	int y = 0;
-	for (const std::string s: solution)
+	for (const std::string& s: solution)
 		mvwaddstr(window, y++, 0, s.c_str());
 
 	wrefresh(window);
@@ -103,7 +107,7 @@ void MessageWindow::refresh()
 	wmove(window, 0, 1);
 	waddstr_colored(message, SERVICE_COLOR);
 
-	std::string lan = lan_to_str();
+	std::string lan = lang_to_str();
 	wmove(window, 0, geometry.w - lan.size() - 1);
 	waddstr_colored(lan, SERVICE_COLOR);
 	wrefresh(window);
@@ -116,47 +120,40 @@ void AnswerWindow::update_screen()
 
 	size_t y = 0;
 	if (mode == Mode::INPUT) {
-		for (const std::string s: answer)
+		for (const std::string& s: answer)
 			mvwaddstr(window, y++, 0, s.c_str());
 	} else if (mode == Mode::OUTPUT) {
-		static auto mvwaddstr_colored = [&](int y, int x, const char *str, int color_scheme) {
+		static auto mvwaddstr_colored = [&](int y, int x, const std::string& str, int color, bool bold = false) {
 			wmove(window, y, x);
-			return waddstr_colored(str, color_scheme);
+			return waddstr_colored(str, color, bold);
 		};
 
-		for (auto line_it = verification.answer.begin()
-			; line_it != verification.answer.end(); ++line_it, ++y) {
-			std::string line = *line_it;
-
+		for (const std::string& line: verification.answer) {
 			mvwaddstr(window, y, 0, line.c_str());
 			const auto errors_map_it = verification.errors.find(y);
-			if (errors_map_it != verification.errors.end()) {
-				const std::map<int, std::string>& errors_map = errors_map_it->second;
-				for (auto errors_it = errors_map.cbegin(); errors_it != errors_map.cend(); ++errors_it) {
-					mvwaddstr_colored(y, errors_it->first, errors_it->second.c_str(), RED_BKGR);
+			if (errors_map_it != verification.errors.end())
+				for (auto e: errors_map_it->second) {
+					if (e.what == analysis::Error::ERROR_LEXEM)
+						mvwaddstr_colored(y, e.pos, to_utf8(e.str), ERROR_WHITE, false);
+					if (e.what == analysis::Error::ERROR_SYMBOL)
+						mvwaddstr_colored(y, e.pos, to_utf8(e.str), ERROR_BLACK, true);
 				}
-
-//				size_t error_since_sym = static_cast<size_t>(error_it->second);
-//				if (error_since_sym < line_it->size()) {
-//					mvwaddstr(window, y, 0, line_it->substr(0, error_since_sym).c_str());
-//					waddstr_colored(line_it->substr(error_since_sym), RED_BKGR);
-//				} else {
-//					mvwaddstr(window, y, 0, line_it->c_str());
-//					waddstr_colored(" ", RED_BKGR);
-//				}
-			}
+			++y;
 		}
 
 		++y;
 		if (verification.state == analysis::MARK::RIGHT) {
 			mvwaddstr_colored(y, 0, "[right]", SERVICE_COLOR);
-		} else if (verification.state == analysis::MARK::INVALID_LINES_NUMBER) {
+		} else if ((verification.state & analysis::MARK::INVALID_LINES_NUMBER) != 0) {
 			mvwaddstr_colored(y, 0, "[invalid lines amount]", SERVICE_COLOR);
-		} else if (verification.state == analysis::MARK::ERROR) {
+		} else if ((verification.state & analysis::MARK::ERROR) != 0) {
 			mvwaddstr_colored(y, 0, "[invalid answer]", SERVICE_COLOR);
-		} else if (verification.state == analysis::MARK::NOT_FULL_ANSWER) {
+		} else if ((verification.state & analysis::MARK::NOT_FULL_ANSWER) != 0) {
 			mvwaddstr_colored(y, 0, "[not full answer]", SERVICE_COLOR);
+		} else if ((verification.state & analysis::MARK::REDUNDANT_ANSWER) != 0) {
+			mvwaddstr_colored(y, 0, "[redundant answer]", SERVICE_COLOR);
 		}
+
 	}
 }
 
@@ -216,9 +213,9 @@ void AnswerWindow::key_process(int key)
 			update_line();
 			break;
 		default:
-			if (key <= 128) { // ascii
+			if (key < 0x80) { // one-byte octet
 				editor->add_ch(key);
-			} else { // utf-8
+			} else {          // two-bytes octet
 				int ch_low = wgetch(window);
 				editor->add_ch(key, ch_low);
 			}

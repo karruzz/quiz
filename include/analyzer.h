@@ -11,26 +11,38 @@
 
 namespace analysis {
 
-enum class MARK {
-	RIGHT,
-	INVALID_LINES_NUMBER,
-	NOT_FULL_ANSWER,
-	ERROR
+enum MARK {
+	RIGHT                = 0x0,
+	INVALID_LINES_NUMBER = 0x1,
+	NOT_FULL_ANSWER      = 0x2,
+	REDUNDANT_ANSWER     = 0x4,
+	ERROR                = 0x8
 };
+
+struct Error
+{
+	enum WHAT {
+		ERROR_LEXEM,
+		ERROR_SYMBOL
+	};
+
+	WHAT what;
+	std::u16string str;
+	size_t pos;
+};
+
 
 struct Verification
 {
-	Problem problem;
 	std::list<std::string> answer;
 	std::list<std::string> solution;
 
-	MARK state;
+	int state;
 	// <line, <position_on_screen, string>>
-	std::map<int, std::map<int, std::string>> errors;
+	std::map<int, std::list<Error>> errors;
 
 	Verification(const Problem& p, const std::list<std::string>& a)
-		: problem(p)
-		, answer(a)
+		: answer(a)
 		, solution(!p.inverted ? p.solution : p.question)
 		, state(MARK::RIGHT)
 	{}
@@ -43,7 +55,13 @@ struct Verification
 class Analyzer
 {
 public:
-	Verification check(const Problem& problem, const std::list<std::string>& answer);
+	enum OPTIONS {
+		NONE = 0,
+		CASE_INSENSITIVE
+	};
+
+	Verification check(
+		const Problem& problem, const std::list<std::string>& answer, Analyzer::OPTIONS flags);
 };
 
 } // namespace analyze

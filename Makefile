@@ -1,11 +1,11 @@
-CPPFLAGS = -Wall -std=c++11
+CPPFLAGS = -Wall -std=c++17
 LDFLAGS =
 CC = g++
 INCLUDES = -Iinclude -I/usr/include/pocketsphinx -I/usr/include/x86_64-linux-gnu/sphinxbase
 BIN_DIR = bin
 BUILD_DIR = build
-LIBS = -lboost_filesystem -lboost_system -lncursesw -lpocketsphinx -lsphinxbase -lsphinxad
-SOURCES = src/learn.cpp src/parser.cpp src/analyzer.cpp src/voice.cpp src/view/ncurses/ncurses_screen.cpp src/view/ncurses/window.cpp src/view/ncurses/editor.cpp src/utils.cpp
+LIBS = -lncursesw -lpocketsphinx -lsphinxbase -lsphinxad -lstdc++fs
+SOURCES = src/log.cpp src/learn.cpp src/parser.cpp src/analyzer.cpp src/voice.cpp src/view/ncurses/ncurses_screen.cpp src/view/ncurses/window.cpp src/view/ncurses/editor.cpp src/utils.cpp
 
 dir_guard=@mkdir -p $(@D)
 

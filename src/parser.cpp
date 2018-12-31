@@ -5,16 +5,19 @@
 #include <set>
 #include <numeric>
 #include <functional>
-
-#include <boost/filesystem/operations.hpp>
+#include <experimental/filesystem>
+#include <cassert>
 
 #include "parser.h"
-#include <utils.h>
+#include "utils.h"
+#include "log.h"
 
 #define USE_TOPICS "-t"
 #define NUMBERS    "-n"
 
 namespace {
+
+namespace fs = std::experimental::filesystem;
 
 // question file structs
 const char COMMENT   = '#';
@@ -85,20 +88,17 @@ void trim_type(std::string& s)
 	s.erase(0, 1);
 }
 
-}
-
-static
-std::map<size_t, Statistic> load_statistic(const boost::filesystem::path &lrn_file_path)
+std::map<size_t, Statistic> load_statistic(const fs::path& quiz_path)
 {
 	std::map<size_t, Statistic> result;
 
-	boost::filesystem::path stat_file_path = "." + lrn_file_path.stem().string() + ".stat";
-	stat_file_path = lrn_file_path.parent_path() / stat_file_path;
+	fs::path stat_path = "." + quiz_path.stem().string() + ".stat";
+	stat_path = quiz_path.parent_path() / stat_path;
 
-	if (!boost::filesystem::exists(stat_file_path) || !boost::filesystem::is_regular_file(stat_file_path))
+	if (!fs::exists(stat_path) || !fs::is_regular_file(stat_path))
 		return result;
 
-	std::ifstream stat_ifstream(stat_file_path.string());
+	std::ifstream stat_ifstream(stat_path.string());
 	if (!stat_ifstream.is_open())
 		return result;
 
@@ -126,8 +126,8 @@ std::map<size_t, Statistic> load_statistic(const boost::filesystem::path &lrn_fi
 			std::istringstream tag_ss(question_hash_line);
 			if (tag_ss >> question_hash) {
 #ifdef DEBUG
-				std::cout << "line: " << question_hash_line << "; hash: " << question_hash;
-				std::cout << "; total: " << total_errors << "; last: " << last_errors << std::endl;
+				logging::Message() << "line: " << question_hash_line << "; hash: " << question_hash;
+//				logging::Message() << "; total: " << total_errors << "; last: " << last_errors << std::endl;
 #endif
 				result.insert(std::pair<size_t, Statistic>(
 					question_hash, Statistic(question_hash, total_errors, last_errors)));
@@ -145,25 +145,26 @@ std::map<size_t, Statistic> load_statistic(const boost::filesystem::path &lrn_fi
 	return result;
 }
 
-void Parser::save_statistic(const std::vector<Problem> &problems, const boost::filesystem::path &path)
+} // namespace
+
+void Parser::save_statistic(const std::vector<Problem>& problems, const fs::path& path)
 {
-	boost::filesystem::path stat_path = "." + path.stem().string() + ".stat";
+	fs::path stat_path = "." + path.stem().string() + ".stat";
 	stat_path = path.parent_path() / stat_path;
 
 	std::ofstream of(stat_path.string());
 	if(!of.is_open()) {
-		std::cerr << "Cannot create statisics file" << std::endl;
+		logging::Error() << "Cannot create statisics file" << logging::endl;
 		return;
 	}
 
 	of << COMMENT <<  " > 2 0: total_errors - 2, last_errors - 0" << std::endl;
 	of << std::endl;
-	std::vector<Problem>::const_iterator it = problems.begin();
-	for (; it != problems.end(); ++it) {
-		of << COMMENT << " " << it->question.front() << std::endl;
-		of << HASH << " " << it->question_hash << std::endl;
-		of << STATISTIC << " " << it->total_errors << " ";
-		of << (it->was_attempt ? it->errors : it->last_errors) << std::endl;
+	for (const Problem& p: problems) {
+		of << COMMENT << " " << p.question.front() << std::endl;
+		of << HASH << " " << p.question_hash << std::endl;
+		of << STATISTIC << " " << p.total_errors << " ";
+		of << (p.was_attempt ? p.errors : p.last_errors) << std::endl;
 		of << std::endl;
 	}
 
@@ -172,13 +173,13 @@ void Parser::save_statistic(const std::vector<Problem> &problems, const boost::f
 }
 
 std::vector<Problem> Parser::load(
-		const boost::filesystem::path &quiz_path,
+		const fs::path& quiz_path,
 		const std::map<std::string, std::vector<std::string> >& params)
 {
 	std::vector<Problem> problems;
 	std::map<std::string, std::list<std::string>> repeat_blocks;
 
-	if (!boost::filesystem::exists(quiz_path) || !boost::filesystem::is_regular_file(quiz_path))
+	if (!fs::exists(quiz_path) || !fs::is_regular_file(quiz_path))
 		return problems;
 
 	std::ifstream quiz_ifstream(quiz_path.string());
@@ -294,18 +295,18 @@ std::vector<Problem> Parser::load(
 
 	quiz_ifstream.close();
 
-	for (auto it = problems.begin(); it != problems.end(); ++it) {
-		std::string s = std::accumulate(it->question.begin(), it->question.end(), std::string(""));
-		it->question_hash = std::hash<std::string>()(s);
+	for (Problem& p: problems) {
+		std::string s = std::accumulate(p.question.begin(), p.question.end(), std::string(""));
+		p.question_hash = std::hash<std::string>()(s);
 	}
 
 	std::map<size_t, Statistic> stat = load_statistic(quiz_path);
 
-	for (auto it = problems.begin(); it != problems.end(); ++it) {
-		std::map<size_t, Statistic>::iterator mit = stat.find(it->question_hash);
+	for (Problem& p: problems) {
+		std::map<size_t, Statistic>::iterator mit = stat.find(p.question_hash);
 		if (mit != stat.end()) {
-			it->total_errors = mit->second.total_errors;
-			it->last_errors = mit->second.last_errors;
+			p.total_errors = mit->second.total_errors;
+			p.last_errors = mit->second.last_errors;
 		}
 	}
 

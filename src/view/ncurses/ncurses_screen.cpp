@@ -20,8 +20,6 @@
 #include <thread>
 
 #define TAB_SIZE 4
-#define COLOR_LIGHT_WHITE 15
-#define COLOR_GRAY 8
 
 namespace view {
 
@@ -30,21 +28,39 @@ namespace ncurses {
 NScreen::NScreen(bool enter_accept_mode)
 	: enter_accept_mode(enter_accept_mode)
 {
+	enum CLR_CODE {
+		LIGHT_RED = 1,
+		GRAY = 8,
+		RED = 9,
+		GREEN = 10,
+		YELLOW = 11,
+		BLUE = 12,
+		MAGENTA = 13,
+		CYAN = 14,
+		LIGHT_WHITE = 15,
+		DARK_BLACK = 16,
+	};
+
 	initscr();
 	set_tabsize(TAB_SIZE);
 	start_color();
 	cbreak();
 	noecho();
 
-	init_pair(CYAN, 14, COLOR_GRAY);
-	init_pair(RED, 9, COLOR_GRAY);
-	init_pair(GREEN, 10, COLOR_GRAY);
-	init_pair(YELLOW, 11, COLOR_GRAY);
-	init_pair(BLUE, 12, COLOR_GRAY);
-	init_pair(MAGENTA, 13, COLOR_GRAY);
+	int bkgr = CLR_CODE::GRAY;
+	int bkgr_error = CLR_CODE::LIGHT_RED;
 
-	init_pair(COLOR::RED_BKGR, COLOR_LIGHT_WHITE, COLOR_RED);
-	init_pair(BKGR, COLOR_LIGHT_WHITE, COLOR_GRAY);
+	init_pair(CLR_SCHEME::WHITE, CLR_CODE::LIGHT_WHITE, bkgr);
+
+	init_pair(CLR_SCHEME::CYAN, CLR_CODE::CYAN, bkgr);
+	init_pair(CLR_SCHEME::RED, CLR_CODE::RED, bkgr);
+	init_pair(CLR_SCHEME::GREEN, CLR_CODE::GREEN, bkgr);
+	init_pair(CLR_SCHEME::YELLOW, CLR_CODE::YELLOW, bkgr);
+	init_pair(CLR_SCHEME::BLUE, CLR_CODE::BLUE, bkgr);
+	init_pair(CLR_SCHEME::MAGENTA, CLR_CODE::MAGENTA, bkgr);
+
+	init_pair(CLR_SCHEME::ERROR_WHITE, CLR_CODE::LIGHT_WHITE, bkgr_error);
+	init_pair(CLR_SCHEME::ERROR_BLACK, CLR_CODE::DARK_BLACK, bkgr_error);
 
 	window_statistic.reset(new StatisticWindow());
 	window_question.reset(new QuestionWindow());

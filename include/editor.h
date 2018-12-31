@@ -12,7 +12,7 @@ class Editor
 	const size_t utf8_width;
 
 	std::vector<std::string> lines;
-	// position of every symbol of lines on screen, need to handle tabs and utf-8 pair symbols
+	// position of line's every symbol on screen, needs to handle tabs and utf-8 paired symbols
 	std::vector<std::vector<size_t>> screen_positions;
 
 	size_t cursor_x, cursor_y;

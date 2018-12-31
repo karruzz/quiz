@@ -1,43 +1,23 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include <cwctype>
+
 #include <utils.h>
-
-namespace {
-
-int is_space_not_tab(int c)
-{
-	return static_cast<int>(std::isspace(c) && c != '\t');
-}
-
-void ltrim(std::string &s)
-{
-	s.erase(s.begin(), std::find_if(s.begin(), s.end(),
-			std::not1(std::ptr_fun<int, int>(is_space_not_tab))));
-}
-
-void rtrim(std::string &s)
-{
-	s.erase(std::find_if(s.rbegin(), s.rend(),
-			std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-}
-
-int octets_count(char c)
-{
-	uint8_t lead = static_cast<uint8_t>(c);
-	if (lead < 0x80)         return 1;
-	if ((lead >> 5) == 0x06) return 2;
-	if ((lead >> 4) == 0x0E) return 3;
-	if ((lead >> 3) == 0x1E) return 4;
-	throw std::runtime_error("invalid utf8 symbol");
-}
-
-} // namespace
 
 void trim_spaces(std::string &s)
 {
-	ltrim(s);
-	rtrim(s);
+	auto is_space_not_tab1 = [](int c) -> int {
+		return static_cast<int>(std::isspace(c) && c != '\t');
+	};
+
+	// left trim
+	s.erase(s.begin(), std::find_if(s.begin(), s.end(),
+		std::not1(std::ptr_fun<int, int>(is_space_not_tab1))));
+
+	// right trim
+	s.erase(std::find_if(s.rbegin(), s.rend(),
+		std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
 }
 
 void remove_duplicate_spaces(std::string& src)
@@ -46,20 +26,46 @@ void remove_duplicate_spaces(std::string& src)
 	src.erase(std::unique(src.begin(), src.end(), adjacent_spaces), src.end());
 }
 
-size_t utf8_length(const std::string& s)
+void to_lower(std::u16string& src)
 {
-	size_t len = 0;
-	for (size_t i = 0; i < s.size(); i += octets_count(s.at(i)), ++len);
-	return len;
+	std::transform(src.begin(), src.end(), src.begin(), ::towlower);
 }
 
-std::vector<std::string> utf8_split(const std::string& s)
+std::u16string to_utf16(const std::string& in)
 {
-	std::vector<std::string> result;
-	int len = 0;
-	for (size_t i = 0; i < s.size(); i += len) {
-		len = octets_count(s.at(i));
-		result.push_back(s.substr(i, len));
+	std::u16string out;
+	const uint8_t* s = reinterpret_cast<const uint8_t*>(in.data());
+	while (*s) {
+		if (*s < 0x80) {
+			out.push_back(*s);
+			s += 1;
+		} else if ((*s >> 5) == 0x06) {
+			out.push_back(((*s << 6) & 0x7FF) + (*(s+1) & 0x3F)); // integral promotion
+			s += 2;
+		} else if ((*s >> 4) == 0x0E) {
+			out.push_back(((*s << 12) & 0xFFFF) + ((*(s+1) << 6) & 0xFFF) + ((*(s+2)) & 0x3F));
+			s += 3;
+		} else
+			throw std::runtime_error("invalid utf8 symbol");
 	}
-	return result;
+
+	return out;
+}
+
+std::string to_utf8(const std::u16string& in)
+{
+	std::string out;
+	for (uint16_t wc: in) {
+		if (wc < 0x80)         // one octet
+			out.push_back(static_cast<uint8_t>(wc));
+		else if (wc < 0x800) { // two octets
+			out.push_back(static_cast<uint8_t>((wc >> 6)          | 0xC0));
+			out.push_back(static_cast<uint8_t>((wc & 0x3F)        | 0x80));
+		} else {               // three octets
+			out.push_back(static_cast<uint8_t>((wc >> 12)         | 0xE0));
+			out.push_back(static_cast<uint8_t>(((wc >> 6) & 0x3F) | 0x80));
+			out.push_back(static_cast<uint8_t>((wc & 0x3F)        | 0x80));
+		}
+	}
+	return out;
 }

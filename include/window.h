@@ -16,24 +16,29 @@ namespace ncurses {
 
 typedef view::LANGUAGE LAN;
 
-enum COLOR {
+enum CLR_SCHEME {
 	BLUE = 1,
-	BKGR,
+	WHITE,
 	CYAN,
 	GREEN,
 	MAGENTA,
 	RED,
-	RED_BKGR,
-	YELLOW
+	YELLOW,
+
+	ERROR_WHITE,
+	ERROR_BLACK
 };
+
 
 struct Point {
 	size_t x, y;
 };
 
+
 struct Geometry {
 	int x, y, w, h;
 };
+
 
 class Window
 {
@@ -42,7 +47,6 @@ protected:
 		WAIT, INPUT, OUTPUT
 	};
 
-//	Window();
 	~Window() {
 		remove();
 	}
@@ -54,13 +58,14 @@ protected:
 	void create();
 	void remove();
 
-	void waddstr_colored(const std::string &s, int color_scheme);
+	void waddstr_colored(const std::string& s, int color_scheme, bool bold = false);
 
 public:
 	virtual void clear();
 	virtual void refresh();
 	virtual void resize(const Geometry g);
 };
+
 
 class CursorWindow : public Window
 {
@@ -99,6 +104,7 @@ public:
 	}
 };
 
+
 class AnswerWindow : public CursorWindow
 {
 	AudioRecord audio_record;
@@ -125,6 +131,7 @@ public:
 	void show_analysed(const analysis::Verification& v);
 };
 
+
 class StatisticWindow : public Window
 {
 	Statistic statistic;
@@ -138,6 +145,7 @@ public:
 	}
 };
 
+
 class QuestionWindow : public Window
 {
 	std::list<std::string> question;
@@ -150,6 +158,7 @@ public:
 		refresh();
 	}
 };
+
 
 class SolutionWindow : public Window
 {
@@ -170,13 +179,14 @@ public:
 	}
 };
 
+
 class MessageWindow : public Window
 {
 	std::string message;
 
 	LAN language;
 
-	std::string lan_to_str() {
+	std::string lang_to_str() {
 		if (language == LAN::RU) return "RU";
 		if (language == LAN::EN) return "EN";
 		return std::string();

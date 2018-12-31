@@ -20,6 +20,7 @@
 
 #include <locale.h>
 
+#include "log.h"
 #include "viewer.h"
 #include "ncurces_screen.h"
 #include "problem.h"
@@ -36,22 +37,25 @@
 #define LANGUAGE_RECOGNIZE "-l"
 #define ENTER_MODE         "-e"
 #define NUMBERS            "-n"
+#define CASE_UNSENSITIVE   "-c"
 
 const char * help_message =
 	"-h	show this help\n" \
 	"-p	play the solution\n" \
 	"-q	play the question\n" \
 	"-m	mixed mode, question and solution may be swapped\n" \
-	"-i	invert questions and solution, discards mixed mode (-m)\n" \
+	"-i	invert questions and solutions, discard mixed mode (-m)\n" \
 	"-s	show statistic\n" \
-	"-r	repeat only problems, which were with errors last time\n" \
-	"-l	answer language auto-detect\n" \
+	"-r	include to quiz problems, which were with errors last time only\n" \
+	"-l	input language auto-detect\n" \
 	"-e	accept answer by enter key\n" \
-	"-t	use topics\n";
+	"-t	use topics\n" \
+	"-c	case unsensitive\n";
 
 // todo:
-// -c - case insensetive == grammar analyzer
-// log
+// cmake
+// tests
+// error status (error, warning, info)
 // variants for right answer
 
 namespace {
@@ -68,7 +72,7 @@ void play(const std::string& phrase)
 	system(audio_play_cmd);
 }
 
-void set_system_lang(LAN language)
+void set_os_lang(LAN language)
 {
 	if (language == LAN::RU)
 		system("setxkbmap -layout ru,us -option grp:alt_shift_toggle");
@@ -81,13 +85,13 @@ void set_system_lang(LAN language)
 int main(int argc, char* argv[])
 {
 	if (argc < 2) {
-		std::cerr << "argv is empty - no input file name" << std::endl;
+		logging::Error() << "argv is empty - no input file name";
 		return 1;
 	}
 
 	std::string problems_filename(argv[1]);
 
-	// split params on keys and values
+	// split params to keys and values
 	std::map<std::string, std::vector<std::string> > params;
 	std::string key;
 	for (int i = 2; i < argc; i++) {
@@ -103,7 +107,7 @@ int main(int argc, char* argv[])
 		}
 
 		if (key.empty()) {
-			std::cerr << "arguments without key" << std::endl;
+			logging::Error() << "arguments without key";
 			return 1;
 		}
 
@@ -111,7 +115,7 @@ int main(int argc, char* argv[])
 	}
 
 	if (problems_filename == "-h" || params.find(SHOW_HELP) != params.end()) {
-		std::cout << help_message;
+		logging::Message() << help_message;
 		return 0;
 	}
 
@@ -121,21 +125,25 @@ int main(int argc, char* argv[])
 	bool invert_mode = params.find(INVERT_MODE) != params.end();
 	bool mixed_mode = params.find(MIXED_MODE) != params.end() && !invert_mode;
 	bool auto_language = params.find(LANGUAGE_RECOGNIZE) != params.end();
+	bool repeat_errors_only = params.find(REPEAT_ERRORS) != params.end();
+	bool show_statistic = params.find(SHOW_STATISTIC) != params.end();
+	bool case_unsensitive = params.find(CASE_UNSENSITIVE) != params.end();
 
 	std::vector<Problem> problems = Parser::load(problems_filename, params);
 
-	if (params.find(SHOW_STATISTIC) != params.end()) {
-		for (std::vector<Problem>::iterator it = problems.begin(); it != problems.end(); ++it) {
-			std::cout << "? ";
-			for (auto it_q = it->question.begin(); it_q != it->question.end(); ++it_q)
-				std::cout << *it_q << std::endl;
+	if (show_statistic) {
+		logging::Message msg;
+		for (const Problem& p: problems) {
+			msg << "? ";
+			for (const std::string& q: p.question)
+				msg << q << logging::endl;
 
-			std::cout << "> ";
+			msg << "> ";
 #ifdef DEBUG
-			std::cout << "hash: " << it->question_hash << "; ";
+			msg << "hash: " << p.question_hash << "; ";
 #endif
-			std::cout << "total_errors: " << it->total_errors << "; " ;
-			std::cout << "last_errors: " << it->last_errors << "; ";
+			msg << "total errors: " << p.total_errors << "; " ;
+			msg << "last errors: " << p.last_errors << ";" << logging::endl;
 		}
 		return 0;
 	}
@@ -146,9 +154,6 @@ int main(int argc, char* argv[])
 	std::mt19937 generator(rd()); // standard mersenne_twister_engine seeded with rd()
 
 	std::vector<int> to_solve;
-	int solving_num = -1, previous_solving_num = -1;
-
-	bool repeat_errors_only = params.find(REPEAT_ERRORS) != params.end();
 	for (size_t i = 0; i < problems.size(); ++i) {
 		if (repeat_errors_only && problems[i].last_errors == 0)
 			continue;
@@ -157,13 +162,13 @@ int main(int argc, char* argv[])
 	}
 
 	view::ncurses::NScreen screen(enter_accept_mode);
-	int test_total_errors = 0, problems_solved = 0;
+	int errors_count = 0, solved_count = 0, solving_num = -1, previous_solving_num = -1;
 
 	auto update_statistic = [&]() {
 		view::Statistic statistic = {
 			static_cast<int>(to_solve.size()),
-			problems_solved,
-			test_total_errors,
+			solved_count,
+			errors_count,
 			problems.at(solving_num).repeat,
 			problems.at(solving_num).errors,
 			problems.at(solving_num).total_errors
@@ -183,12 +188,13 @@ int main(int argc, char* argv[])
 		if (invert_mode)
 			problem.inverted = true;
 
-		bool qa_swapped = false;
 		if (mixed_mode) {
 			std::uniform_int_distribution<> distribution (0, 1);
-			if (distribution(generator) % 2 == 0) {
-				problem.inverted = true;
-				qa_swapped = true;
+			problem.inverted = distribution(generator) == 0;
+			if (auto_language) {
+				LAN language = problem.inverted ? LAN::RU : LAN::EN;
+				set_os_lang(language);
+				screen.set_language(language);
 			}
 		}
 
@@ -197,15 +203,10 @@ int main(int argc, char* argv[])
 
 		try {
 			update_statistic();
-			if (auto_language) {
-				LAN language = qa_swapped ? LAN::EN : LAN::RU;
-				set_system_lang(language);
-				screen.set_language(language);
-			}
 			screen.show_problem(problem);
 			std::tie(input_state, answer) = screen.get_answer();
 		} catch(const std::exception &e) {
-			std::cerr << e.what() << std::endl;
+			logging::Error() << e.what() << logging::endl;
 			return 0;
 		}
 
@@ -224,19 +225,22 @@ int main(int argc, char* argv[])
 		}
 
 		problem.was_attempt = true;
-		analysis::Verification result = analyzer.check(problem, answer);
+		analysis::Analyzer::OPTIONS flags = case_unsensitive
+			? analysis::Analyzer::OPTIONS::CASE_INSENSITIVE
+			: analysis::Analyzer::OPTIONS::NONE;
+		analysis::Verification result = analyzer.check(problem, answer, flags);
 
 		if (result.state == analysis::MARK::RIGHT) {
 			--problem.repeat;
 			if (problem.repeat == 0) {
-				++problems_solved;
+				++solved_count;
 				to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
 			}
 		} else {
 			problem.repeat = REPEAT_TIMES;
 			++problem.total_errors;
 			++problem.errors;
-			++test_total_errors;
+			++errors_count;
 		}
 
 		update_statistic();
