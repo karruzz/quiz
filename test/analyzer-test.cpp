@@ -12,8 +12,8 @@ namespace an = analysis;
 TEST (AnalyzeTest, Grammar)
 {
 	Problem p;
-	p.question.push_back("Hello world");
-	p.solution.push_back("Привет мир");
+	p.question = { "Hello world" };
+	p.solution = { "Привет мир" };
 	std::list<std::string> answer = { "превет" };
 
 	an::Analyzer a;
