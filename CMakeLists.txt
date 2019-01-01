@@ -20,12 +20,6 @@ add_library(utils_lib OBJECT src/utils.cpp)
 add_executable(quiz "")
 add_dependencies(quiz run_test)
 
-target_include_directories(quiz
-	PRIVATE
-		/usr/include/pocketsphinx
-		/usr/include/x86_64-linux-gnu/sphinxbase
-)
-
 target_sources(quiz
 	PRIVATE
 		src/log.cpp
@@ -42,11 +36,23 @@ target_sources(quiz
 target_link_libraries(quiz
 	PRIVATE
 		ncursesw
-		pocketsphinx
-		sphinxbase
-		sphinxad
 		stdc++fs
 )
+
+if (audio)
+	target_compile_options(quiz PUBLIC -DAUDIO_CAPTURE)
+	target_include_directories(quiz
+		PRIVATE
+			/usr/include/pocketsphinx
+			/usr/include/x86_64-linux-gnu/sphinxbase
+	)
+	target_link_libraries(quiz
+		PRIVATE
+			pocketsphinx
+			sphinxbase
+			sphinxad
+	)
+endif()
 
 # *********************** tests ************************
 set(GTEST_DIR "../../Gtest/googletest")

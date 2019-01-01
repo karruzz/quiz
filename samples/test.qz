@@ -13,13 +13,9 @@ Translate phrase to Russian
 < -Как дела?
   -Хорошо
 
-@ t_2
-Translate phrase to Deutsch
--
+# can use mixed mode for "d" topic
 %d
-> {{t_2}}
-  yes, exactly
+> yes, exactly
 < ja, genau
-> {{t_2}}
-  no, unfortunately
+> no, unfortunately
 < nein, leider
