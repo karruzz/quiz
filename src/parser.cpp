@@ -127,7 +127,7 @@ std::map<size_t, Statistic> load_statistic(const fs::path& quiz_path)
 			if (tag_ss >> question_hash) {
 #ifdef DEBUG
 				logging::Message() << "line: " << question_hash_line << "; hash: " << question_hash;
-//				logging::Message() << "; total: " << total_errors << "; last: " << last_errors << std::endl;
+				logging::Message() << "; total: " << total_errors << "; last: " << last_errors << logging::endl;
 #endif
 				result.insert(std::pair<size_t, Statistic>(
 					question_hash, Statistic(question_hash, total_errors, last_errors)));
@@ -196,7 +196,7 @@ std::vector<Problem> Parser::load(
 
 	bool definite_numbers = params.find(NUMBERS) != params.end();
 	parse_state prev_state = STATE_NONE, state = STATE_NONE;
-	std::string line, block_name;
+	std::string line;
 	std::list<std::string> quest, solut, block;
 	int question_number = -1, questions_loaded = 0;
 	int question_start = -1, question_max = -1, question_step = -1;
@@ -226,21 +226,20 @@ std::vector<Problem> Parser::load(
 			state = STATE_QUESTION_PREPARING;
 		} else if (t == LINE_BLOCK) {
 			state = STATE_BLOCK_PREPARING;
-			block_name = line;
-			continue;
 		}
 
 		bool state_changed = state != prev_state;
 
 		// flush block
 		if (state_changed && prev_state == STATE_BLOCK_PREPARING) {
+			std::string block_name = block.front();
+			block.pop_front();
 			repeat_blocks.insert(std::pair<std::string, std::list<std::string>>(block_name, block));
 			block.clear();
 		}
 
-		if (state == STATE_BLOCK_PREPARING) {
+		if (state == STATE_BLOCK_PREPARING)
 			block.push_back(line);
-		}
 
 		if (use_topics && !needed_topic)
 			continue;

@@ -5,8 +5,7 @@ project(quiz CXX)
 add_compile_options(-Wall -std=c++17)
 
 if (debug)
-	add_compile_options(-g -O0)
-	add_compile_definitions(-DDEBUG)
+	add_compile_options(-g -O0 -DDEBUG)
 endif()
 
 include_directories(

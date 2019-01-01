@@ -1,0 +1,25 @@
+# simple quiz for observing main capabilities
+
+@ task_1
+Translate phrase to Russian
+-
+%r
+> {{task_1}}
+  hello world
+< привет мир
+> {{task_1}}
+  -How are you?
+  -Fine
+< -Как дела?
+  -Хорошо
+
+@ t_2
+Translate phrase to Deutsch
+-
+%d
+> {{t_2}}
+  yes, exactly
+< ja, genau
+> {{t_2}}
+  no, unfortunately
+< nein, leider

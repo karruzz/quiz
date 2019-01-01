@@ -53,7 +53,8 @@ const char * help_message =
 	"-c	case unsensitive\n";
 
 // todo:
-// cmake
+// cmake ..
+// test files to separate dir
 // error status (error, warning, info)
 // variants for right answer
 
