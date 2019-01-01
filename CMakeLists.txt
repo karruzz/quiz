@@ -18,7 +18,6 @@ add_library(utils_lib OBJECT src/utils.cpp)
 
 # *********************** quiz ************************
 add_executable(quiz "")
-add_dependencies(quiz run_test)
 
 target_sources(quiz
 	PRIVATE
@@ -55,30 +54,31 @@ if (audio)
 endif()
 
 # *********************** tests ************************
-set(GTEST_DIR "../../Gtest/googletest")
 
-add_executable(analyze-test "")
+#set GTEST_DIR variable to  "your_path/Gtest/googletest"
+if (GTEST_DIR)
+	add_executable(analyze-test "")
+	add_dependencies(quiz run_test)
+	add_custom_target(run_test ALL ./analyze-test DEPENDS analyze-test)
 
-target_compile_options(analyze-test PRIVATE -pthread)
+	target_compile_options(analyze-test PRIVATE -pthread)
 
-target_include_directories(analyze-test
-	PRIVATE
-		${GTEST_DIR}
-		${GTEST_DIR}/include
-)
+	target_include_directories(analyze-test
+		PRIVATE
+			${GTEST_DIR}
+			${GTEST_DIR}/include
+	)
 
-target_sources(analyze-test
-	PRIVATE
-		${GTEST_DIR}/src/gtest-all.cc
-		test/analyzer-test.cpp
-		$<TARGET_OBJECTS:analyze_lib>
-		$<TARGET_OBJECTS:utils_lib>
-)
+	target_sources(analyze-test
+		PRIVATE
+			${GTEST_DIR}/src/gtest-all.cc
+			test/analyzer-test.cpp
+			$<TARGET_OBJECTS:analyze_lib>
+			$<TARGET_OBJECTS:utils_lib>
+	)
 
-target_link_libraries(analyze-test
-	PRIVATE
-		pthread
-)
-
-# ********************* run tests ************************
-add_custom_target(run_test ALL ./analyze-test DEPENDS analyze-test)
+	target_link_libraries(analyze-test
+		PRIVATE
+			pthread
+	)
+endif()
