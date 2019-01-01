@@ -37,7 +37,7 @@
 #define LANGUAGE_RECOGNIZE "-l"
 #define ENTER_MODE         "-e"
 #define NUMBERS            "-n"
-#define CASE_UNSENSITIVE   "-c"
+#define CASE_UNSENS        "-c"
 
 const char * help_message =
 	"-h	show this help\n" \
@@ -54,7 +54,6 @@ const char * help_message =
 
 // todo:
 // cmake
-// tests
 // error status (error, warning, info)
 // variants for right answer
 
@@ -88,6 +87,8 @@ int main(int argc, char* argv[])
 		logging::Error() << "argv is empty - no input file name";
 		return 1;
 	}
+
+	setlocale(LC_ALL, "");
 
 	std::string problems_filename(argv[1]);
 
@@ -127,7 +128,7 @@ int main(int argc, char* argv[])
 	bool auto_language = params.find(LANGUAGE_RECOGNIZE) != params.end();
 	bool repeat_errors_only = params.find(REPEAT_ERRORS) != params.end();
 	bool show_statistic = params.find(SHOW_STATISTIC) != params.end();
-	bool case_unsensitive = params.find(CASE_UNSENSITIVE) != params.end();
+	bool case_unsensitive = params.find(CASE_UNSENS) != params.end();
 
 	std::vector<Problem> problems = Parser::load(problems_filename, params);
 
@@ -147,8 +148,6 @@ int main(int argc, char* argv[])
 		}
 		return 0;
 	}
-
-	setlocale(LC_ALL, "");
 
 	std::random_device rd;  // used to obtain a seed for the random number engine
 	std::mt19937 generator(rd()); // standard mersenne_twister_engine seeded with rd()
@@ -226,7 +225,7 @@ int main(int argc, char* argv[])
 
 		problem.was_attempt = true;
 		analysis::Analyzer::OPTIONS flags = case_unsensitive
-			? analysis::Analyzer::OPTIONS::CASE_INSENSITIVE
+			? analysis::Analyzer::OPTIONS::CASE_UNSENSITIVE
 			: analysis::Analyzer::OPTIONS::NONE;
 		analysis::Verification result = analyzer.check(problem, answer, flags);
 

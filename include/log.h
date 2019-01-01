@@ -32,17 +32,20 @@ public:
 	int uncaught;
 };
 
-class LogInfo : public Message
+
+class Info : public Message
 {
 public:
-	LogInfo() : Message("[INFO] ") {}
+	Info() : Message("[INFO] ") {}
 };
 
-class LogWarning : public Message
+
+class Warning : public Message
 {
 public:
-	LogWarning() : Message("[WARN] ") {}
+	Warning() : Message("[WARN] ") {}
 };
+
 
 class Error : public Message
 {
@@ -50,11 +53,13 @@ public:
 	Error() : Message("[ERROR] ") {}
 };
 
+
 template <typename T>
 Message& operator<<(Message& record, T&& t) {
 	record.stream << record.prefix << std::forward<T>(t);
 	return record;
 }
+
 
 template <typename T>
 Message& operator<<(Message&& record, T&& t) {

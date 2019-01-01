@@ -103,7 +103,7 @@ Verification Analyzer::check(
 			std::u16string str = answr_lexem->str;
 			size_t pos = answr_lexem->pos;
 
-			if (flags & OPTIONS::CASE_INSENSITIVE) {
+			if (flags & OPTIONS::CASE_UNSENSITIVE) {
 				to_lower(answr);
 				to_lower(solut);
 			}

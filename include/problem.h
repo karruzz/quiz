@@ -23,15 +23,15 @@
 struct Problem {
 	std::list<std::string> question;
 	std::list<std::string> solution;
-	size_t question_hash;
+	size_t question_hash = 0;
 
-	int repeat;
-	int total_errors;
-	int last_errors;
-	int errors;
+	int repeat = 0;
+	int total_errors = 0;
+	int last_errors = 0;
+	int errors = 0;
 
-	bool was_attempt;
-	bool inverted;
+	bool was_attempt = false;
+	bool inverted = false;
 
 	Problem(const std::list<std::string> &q,
 		const std::list<std::string> &s)

@@ -19,6 +19,7 @@ enum MARK {
 	ERROR                = 0x8
 };
 
+
 struct Error
 {
 	enum WHAT {
@@ -52,12 +53,13 @@ struct Verification
 	Verification& operator= (const Verification& v) = default;
 };
 
+
 class Analyzer
 {
 public:
 	enum OPTIONS {
 		NONE = 0,
-		CASE_INSENSITIVE
+		CASE_UNSENSITIVE = 1
 	};
 
 	Verification check(
