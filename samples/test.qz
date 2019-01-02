@@ -13,7 +13,7 @@ Translate phrase to Russian
 < -Как дела?
   -Хорошо
 
-# can use mixed mode for "d" topic
+# can use mixed mode for "deu" topic
 %deu
 > yes, exactly
 < ja, genau
