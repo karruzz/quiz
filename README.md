@@ -1,3 +1,7 @@
+# About
+Tool for learning foreign languages
+![alt text](https://raw.githubusercontent.com/karruzz/quiz/master/samples/screenshot.png)
+
 # Dependencies
 libncurses5-dev
 
