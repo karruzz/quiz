@@ -14,7 +14,7 @@
 #include <map>
 #include <memory>
 
-#include <ncursesw/ncurses.h>
+#include <ncurses.h>
 
 #include <viewer.h>
 #include <window.h>

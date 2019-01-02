@@ -4,3 +4,4 @@ build/
 *.stat
 *.autosave
 CMakeLists.txt.user
+plan

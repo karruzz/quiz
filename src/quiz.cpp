@@ -61,12 +61,6 @@ const char * help_message =
 	"-t	use topics\n" \
 	"-c	case unsensitive\n";
 
-// todo:
-// cmake ..
-// test files to separate dir
-// error status (error, warning, info)
-// variants for right answer
-
 namespace {
 
 typedef view::LANGUAGE LAN;

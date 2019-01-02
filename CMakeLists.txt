@@ -34,7 +34,7 @@ target_sources(quiz
 
 target_link_libraries(quiz
 	PRIVATE
-		ncursesw
+		ncurses
 		stdc++fs
 )
 

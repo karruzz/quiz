@@ -8,7 +8,6 @@
  */
 
 #include <ncurces_screen.h>
-#include <ncursesw/ncurses.h>
 
 #include <algorithm>
 #include <functional>

@@ -3,7 +3,7 @@
 @ task_1
 Translate phrase to Russian
 -
-%r
+%rus
 > {{task_1}}
   hello world
 < привет мир
@@ -14,7 +14,7 @@ Translate phrase to Russian
   -Хорошо
 
 # can use mixed mode for "d" topic
-%d
+%deu
 > yes, exactly
 < ja, genau
 > no, unfortunately
