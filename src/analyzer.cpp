@@ -1,3 +1,12 @@
+/*
+ * analyzer.cpp
+ *
+ *  Created on: Dec 08, 2018
+ *  Copyright © 2018-2081 Ilja Karasev <ilja.karasev@gmail.com>.
+ *  All rights reserved.
+ *     License: GNU GPL 3
+ */
+
 #include <algorithm>
 #include <set>
 #include <vector>

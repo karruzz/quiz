@@ -1,3 +1,12 @@
+/*
+ * ncurces_screen.h
+ *
+ *  Created on: Sep 23, 2018
+ *  Copyright © 2018-2081 Ilja Karasev <ilja.karasev@gmail.com>.
+ *  All rights reserved.
+ *     License: GNU GPL 3
+ */
+
 #ifndef NCURCES_SCREEN_H
 #define NCURCES_SCREEN_H
 

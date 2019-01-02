@@ -1,3 +1,12 @@
+/*
+ * utils.h
+ *
+ *  Created on: Dec 24, 2018
+ *  Copyright © 2018-2081 Ilja Karasev <ilja.karasev@gmail.com>.
+ *  All rights reserved.
+ *     License: GNU GPL 3
+ */
+
 #ifndef UTILS_H
 #define UTILS_H
 

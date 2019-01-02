@@ -1,3 +1,12 @@
+/*
+ * analyzer.h
+ *
+ *  Created on: Dec 08, 2018
+ *  Copyright © 2018-2081 Ilja Karasev <ilja.karasev@gmail.com>.
+ *  All rights reserved.
+ *     License: GNU GPL 3
+ */
+
 #ifndef ANALYZER_H
 #define ANALYZER_H
 

@@ -1,3 +1,12 @@
+/*
+ * editor.h
+ *
+ *  Created on: Sep 23, 2018
+ *  Copyright © 2018-2081 Ilja Karasev <ilja.karasev@gmail.com>.
+ *  All rights reserved.
+ *     License: GNU GPL 3
+ */
+
 #ifndef EDITOR_H
 #define EDITOR_H
 

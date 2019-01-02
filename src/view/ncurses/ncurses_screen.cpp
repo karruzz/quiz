@@ -1,3 +1,12 @@
+/*
+ * ncurses_screen.cpp
+ *
+ *  Created on: Sep 23, 2018
+ *  Copyright © 2018-2081 Ilja Karasev <ilja.karasev@gmail.com>.
+ *  All rights reserved.
+ *     License: GNU GPL 3
+ */
+
 #include <ncurces_screen.h>
 #include <ncursesw/ncurses.h>
 

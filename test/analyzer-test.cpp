@@ -1,3 +1,12 @@
+/*
+ * analyzer-test.cpp
+ *
+ *  Created on: Jan 01, 2019
+ *  Copyright © 2018-2081 Ilja Karasev <ilja.karasev@gmail.com>.
+ *  All rights reserved.
+ *     License: GNU GPL 3
+ */
+
 #include <iostream>
 #include "gtest/gtest.h"
 

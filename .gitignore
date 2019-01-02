@@ -2,4 +2,5 @@ output/
 bin/
 build/
 *.stat
+*.autosave
 CMakeLists.txt.user
