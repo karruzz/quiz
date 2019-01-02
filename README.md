@@ -91,7 +91,7 @@ hello world
 
 ```
 
-# Use sublime syntax file for convinient editing qz files
+# Use sublime syntax file for convenient editing qz files
 ```sh
 $ cp sublime/quiz.sublime-syntax ~/.config/sublime-text-3/Packages/User/
 ```
