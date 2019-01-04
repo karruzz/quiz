@@ -33,21 +33,21 @@ struct Lexem
 };
 
 
-std::vector<Lexem> split_to_lexemes(const std::string& s)
+std::list<Lexem> split_to_lexemes(const std::string& s)
 {
 	static const std::set<char16_t> space_lexems = { ' ', '\t' };
 	static const std::set<char16_t> punctuate_lexems
 		= { ',', '.', '?', '!', '-', ':', ';', '_', '(', ')',
 			'[', ']', '<', '>', '{', '}', '+', '-', '=', '*', '/' };
 
-	std::vector<Lexem> lexemes;
+	std::list<Lexem> lexemes;
 	std::u16string lexem;
 	size_t position = 0;
 	Lexem::WHAT prev_lexem_type = Lexem::UNDEF, lexem_type = Lexem::UNDEF;
 
 	auto try_to_flush_lexem = [&]() {
 		if (prev_lexem_type != Lexem::UNDEF && prev_lexem_type != lexem_type) {
-			lexemes.push_back({ lexem_type, lexem, position});
+			lexemes.push_back({ prev_lexem_type, lexem, position});
 			position += lexem.length();
 			lexem.clear();
 		}
@@ -81,7 +81,7 @@ std::vector<Lexem> split_to_lexemes(const std::string& s)
 } // namespace
 
 Verification Analyzer::check(
-	const Problem& problem, const std::list<std::string>& answer, Analyzer::OPTIONS flags)
+	const Problem& problem, const std::list<std::string>& answer, int flags)
 {
 	Verification v(problem, answer);
 	v.answer.remove("");
@@ -101,6 +101,14 @@ Verification Analyzer::check(
 	{
 		auto answr_lexems = split_to_lexemes(*answr_line);
 		auto solut_lexems = split_to_lexemes(*solut_line);
+
+		answr_lexems.remove_if([](const Lexem& l){ return l.what == Lexem::SPACE; });
+		solut_lexems.remove_if([](const Lexem& l){ return l.what == Lexem::SPACE; });
+
+		if (flags & OPTIONS::PUNCT_UNSENSITIVE) {
+			answr_lexems.remove_if([](const Lexem& l){ return l.what == Lexem::PUNCT; });
+			solut_lexems.remove_if([](const Lexem& l){ return l.what == Lexem::PUNCT; });
+		}
 
 		auto answr_lexem = answr_lexems.cbegin();
 		auto solut_lexem = solut_lexems.cbegin();

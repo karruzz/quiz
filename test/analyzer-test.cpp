@@ -18,7 +18,7 @@ namespace {
 
 namespace an = analysis;
 
-TEST (AnalyzeTest, Grammar)
+TEST (AnalyzeTest, Spelling)
 {
 	Problem p;
 	p.question = { "Hello world" };
@@ -46,6 +46,18 @@ TEST (AnalyzeTest, Grammar)
 	EXPECT_EQ (an::Error::WHAT::ERROR_SYMBOL, e.at(2).what);
 	EXPECT_EQ ((size_t)6, e.at(2).pos);
 	EXPECT_EQ ("...", to_utf8(e.at(2).str));
+}
+
+TEST (AnalyzeTest, Punctuation)
+{
+	Problem p;
+	p.question = { "Hello, world!" };
+	p.solution = { "Привет, мир!" };
+	std::list<std::string> answer = { "Привет мир" };
+
+	an::Analyzer a;
+	an::Verification v = a.check(p, answer, an::Analyzer::OPTIONS::PUNCT_UNSENSITIVE);
+	EXPECT_EQ ((size_t)0, v.errors.size());
 }
 
 }

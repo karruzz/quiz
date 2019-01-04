@@ -67,12 +67,13 @@ class Analyzer
 {
 public:
 	enum OPTIONS {
-		NONE = 0,
-		CASE_UNSENSITIVE = 1
+		NONE              = 0x0,
+		CASE_UNSENSITIVE  = 0x1,
+		PUNCT_UNSENSITIVE = 0x2,
 	};
 
 	Verification check(
-		const Problem& problem, const std::list<std::string>& answer, Analyzer::OPTIONS flags);
+		const Problem& problem, const std::list<std::string>& answer, int flags);
 };
 
 } // namespace analyze

@@ -47,6 +47,7 @@
 #define ENTER_MODE         "-e"
 #define NUMBERS            "-n"
 #define CASE_UNSENS        "-c"
+#define PUNCT_UNSENS       "-u"
 
 const char * help_message =
 	"-h	show this help\n" \
@@ -59,9 +60,12 @@ const char * help_message =
 	"-l	input language auto-detect\n" \
 	"-e	accept answer by enter key\n" \
 	"-t	use topics\n" \
-	"-c	case unsensitive\n";
+	"-c	case unsensitive\n" \
+	"-u	punctuation unsensitive\n";
 
 namespace {
+
+namespace an = analysis;
 
 typedef view::LANGUAGE LAN;
 
@@ -133,6 +137,7 @@ int main(int argc, char* argv[])
 	bool repeat_errors_only = params.find(REPEAT_ERRORS) != params.end();
 	bool show_statistic = params.find(SHOW_STATISTIC) != params.end();
 	bool case_unsensitive = params.find(CASE_UNSENS) != params.end();
+	bool punct_unsensitive = params.find(PUNCT_UNSENS) != params.end();
 
 	std::vector<Problem> problems = Parser::load(problems_filename, params);
 
@@ -179,7 +184,7 @@ int main(int argc, char* argv[])
 		screen.update_statistic(statistic);
 	};
 
-	analysis::Analyzer analyzer;
+	an::Analyzer analyzer;
 	while (to_solve.size() != 0) {
 		do {
 			std::uniform_int_distribution<> distribution (0, to_solve.size() - 1);
@@ -228,12 +233,12 @@ int main(int argc, char* argv[])
 		}
 
 		problem.was_attempt = true;
-		analysis::Analyzer::OPTIONS flags = case_unsensitive
-			? analysis::Analyzer::OPTIONS::CASE_UNSENSITIVE
-			: analysis::Analyzer::OPTIONS::NONE;
-		analysis::Verification result = analyzer.check(problem, answer, flags);
+		int flags = an::Analyzer::NONE;
+		if (case_unsensitive) flags |= an::Analyzer::CASE_UNSENSITIVE;
+		if (punct_unsensitive) flags |= an::Analyzer::PUNCT_UNSENSITIVE;
+		an::Verification result = analyzer.check(problem, answer, flags);
 
-		if (result.state == analysis::MARK::RIGHT) {
+		if (result.state == an::MARK::RIGHT) {
 			--problem.repeat;
 			if (problem.repeat == 0) {
 				++solved_count;

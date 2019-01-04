@@ -66,6 +66,7 @@ $ ./quiz -h
 -e	accept answer by enter key
 -t	use topics
 -c	case unsensitive
+-u	punctuation unsensitive
 ```
 
 start test.qz, words from "deu" topic only, mixed mode, accept by "enter" key:
