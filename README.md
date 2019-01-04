@@ -3,7 +3,7 @@ Tool for learning foreign languages
 ![alt text](https://raw.githubusercontent.com/karruzz/quiz/master/samples/s.png)
 
 # Dependencies
-libncurses5-dev
+libncursesw5-dev
 
 # Build
 ```sh

@@ -13,7 +13,7 @@
 #include <functional>
 #include <memory>
 
-#include <ncurses.h>
+#include <ncursesw/ncurses.h>
 
 #include <editor.h>
 #include <voice.h>

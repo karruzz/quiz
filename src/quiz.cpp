@@ -88,7 +88,7 @@ void set_os_lang(LAN language)
 int main(int argc, char* argv[])
 {
 	if (argc < 2) {
-		logging::Error() << "argv is empty - no input file name";
+		logging::Error() << "argv is empty - no input file name" << logging::endl;
 		return 1;
 	}
 
