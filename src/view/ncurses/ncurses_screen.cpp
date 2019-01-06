@@ -57,6 +57,7 @@ NScreen::NScreen(bool enter_accept_mode)
 
 	int bkgr = CLR_CODE::GRAY;
 	int bkgr_error = CLR_CODE::LIGHT_RED;
+	int bkgr_missed = CLR_CODE::YELLOW;
 
 	init_pair(CLR_SCHEME::WHITE, CLR_CODE::LIGHT_WHITE, bkgr);
 
@@ -69,6 +70,7 @@ NScreen::NScreen(bool enter_accept_mode)
 
 	init_pair(CLR_SCHEME::ERROR_WHITE, CLR_CODE::LIGHT_WHITE, bkgr_error);
 	init_pair(CLR_SCHEME::ERROR_BLACK, CLR_CODE::DARK_BLACK, bkgr_error);
+	init_pair(CLR_SCHEME::MISSED_BLACK, CLR_CODE::DARK_BLACK, bkgr_missed);
 
 	window_statistic.reset(new StatisticWindow());
 	window_question.reset(new QuestionWindow());

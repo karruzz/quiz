@@ -46,7 +46,12 @@ std::list<Lexem> split_to_lexemes(const std::string& s)
 	Lexem::WHAT prev_lexem_type = Lexem::UNDEF, lexem_type = Lexem::UNDEF;
 
 	auto try_to_flush_lexem = [&]() {
-		if (prev_lexem_type != Lexem::UNDEF && prev_lexem_type != lexem_type) {
+		if (prev_lexem_type != Lexem::UNDEF &&
+				(prev_lexem_type != lexem_type
+				 || prev_lexem_type == Lexem::PUNCT
+				 || prev_lexem_type == Lexem::SPACE)
+			)
+		{
 			lexemes.push_back({ prev_lexem_type, lexem, position});
 			position += lexem.length();
 			lexem.clear();
@@ -85,10 +90,6 @@ Verification Analyzer::check(
 {
 	Verification v(problem, answer);
 	v.answer.remove("");
-	if(v.solution.size() != v.answer.size()) {
-		v.state = MARK::INVALID_LINES_NUMBER;
-		return v;
-	}
 
 	std::for_each(v.answer.begin(), v.answer.end(), trim_spaces);
 	std::for_each(v.answer.begin(), v.answer.end(), remove_duplicate_spaces);
@@ -117,28 +118,46 @@ Verification Analyzer::check(
 		{
 			std::u16string answr = answr_lexem->str;
 			std::u16string solut = solut_lexem->str;
-			std::u16string str = answr_lexem->str;
 			size_t pos = answr_lexem->pos;
+
+			std::u16string answr_next;
+			auto answr_it_next = std::next(answr_lexem);
+			if (answr_it_next != answr_lexems.cend())
+				answr_next = answr_it_next->str;
+
+			std::u16string solut_next;
+			auto solut_it_next = std::next(solut_lexem);
+			if (solut_it_next != solut_lexems.cend())
+				solut_next = solut_it_next->str;
 
 			if (flags & OPTIONS::CASE_UNSENSITIVE) {
 				to_lower(answr);
 				to_lower(solut);
+				to_lower(answr_next);
+				to_lower(solut_next);
 			}
 
 			if (answr != solut) {
-				v.errors[line_num].push_back({Error::ERROR_LEXEM, str, pos});
+				if (pos != 0 && answr == solut_next) { // lexem missed in answer
+					++solut_lexem;
+					v.errors[line_num].push_back({Error::MISSED_LEXEM, to_utf16(" "), pos - 1});
+				} else if (answr_next == solut) { // redundant lexem in answer
+					++answr_lexem;
+					v.errors[line_num].push_back({Error::REDUN_LEXEM, answr, pos});
+				} else { // error lexem
+					v.errors[line_num].push_back({Error::ERROR_LEXEM, answr, pos});
 
-				for (size_t i = 0; i < answr.size() && i < solut.size(); ++i)
-					if (answr.at(i) != solut.at(i)) {
+					for (size_t i = 0; i < answr.size() && i < solut.size(); ++i)
+						if (answr.at(i) != solut.at(i)) {
+							v.errors[line_num].push_back(
+								{Error::ERROR_SYMBOL, std::u16string(1, answr.at(i)), pos + i});
+						}
+
+					// different length
+					if (solut.size() < answr.size())
 						v.errors[line_num].push_back(
-							{Error::ERROR_SYMBOL, std::u16string(1, str.at(i)), pos + i});
-					}
-
-				// different length
-				if (solut.size() < answr.size())
-					v.errors[line_num].push_back(
-						{Error::ERROR_SYMBOL, str.substr(solut.size()), pos + solut.size()});
-
+							{Error::ERROR_SYMBOL, answr.substr(solut.size()), pos + solut.size()});
+				}
 				v.state |= MARK::ERROR;
 			}
 		}
@@ -158,6 +177,9 @@ Verification Analyzer::check(
 			v.state |= MARK::REDUNDANT_ANSWER;
 		}
 	}
+
+	if(v.solution.size() != v.answer.size())
+		v.state |= MARK::INVALID_LINES_NUMBER;
 
 	return v;
 }

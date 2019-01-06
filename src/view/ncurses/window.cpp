@@ -146,6 +146,8 @@ void AnswerWindow::update_screen()
 						mvwaddstr_colored(y, e.pos, to_utf8(e.str), ERROR_WHITE, false);
 					if (e.what == analysis::Error::ERROR_SYMBOL)
 						mvwaddstr_colored(y, e.pos, to_utf8(e.str), ERROR_BLACK, true);
+					if (e.what == analysis::Error::MISSED_LEXEM || e.what == analysis::Error::REDUN_LEXEM)
+						mvwaddstr_colored(y, e.pos, to_utf8(e.str), MISSED_BLACK, true);
 				}
 			++y;
 		}
@@ -153,14 +155,15 @@ void AnswerWindow::update_screen()
 		++y;
 		if (verification.state == analysis::MARK::RIGHT) {
 			mvwaddstr_colored(y, 0, "[right]", SERVICE_COLOR);
-		} else if ((verification.state & analysis::MARK::INVALID_LINES_NUMBER) != 0) {
-			mvwaddstr_colored(y, 0, "[invalid lines amount]", SERVICE_COLOR);
-		} else if ((verification.state & analysis::MARK::ERROR) != 0) {
-			mvwaddstr_colored(y, 0, "[invalid answer]", SERVICE_COLOR);
-		} else if ((verification.state & analysis::MARK::NOT_FULL_ANSWER) != 0) {
-			mvwaddstr_colored(y, 0, "[not full answer]", SERVICE_COLOR);
-		} else if ((verification.state & analysis::MARK::REDUNDANT_ANSWER) != 0) {
-			mvwaddstr_colored(y, 0, "[redundant answer]", SERVICE_COLOR);
+		} else {
+			if ((verification.state & analysis::MARK::INVALID_LINES_NUMBER) != 0)
+				mvwaddstr_colored(y++, 0, "[invalid lines amount]", SERVICE_COLOR);
+			if ((verification.state & analysis::MARK::ERROR) != 0)
+				mvwaddstr_colored(y++, 0, "[invalid answer]", SERVICE_COLOR);
+			if ((verification.state & analysis::MARK::NOT_FULL_ANSWER) != 0)
+				mvwaddstr_colored(y++, 0, "[not full answer]", SERVICE_COLOR);
+			if ((verification.state & analysis::MARK::REDUNDANT_ANSWER) != 0)
+				mvwaddstr_colored(y++, 0, "[redundant answer]", SERVICE_COLOR);
 		}
 
 	}

@@ -18,6 +18,9 @@ contexts:
       scope: constant.character
       push:
       - meta_scope: constant.character
+      - match: "^#.*"
+        scope: comment
+
       - match: "^<"
         pop: true
         scope: default
@@ -26,5 +29,8 @@ contexts:
       scope: keyword
 
     - match: "^%.*"
+      scope: constant.numeric
+
+    - match: "с"
       scope: constant.numeric
 

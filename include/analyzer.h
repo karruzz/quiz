@@ -33,7 +33,9 @@ struct Error
 {
 	enum WHAT {
 		ERROR_LEXEM,
-		ERROR_SYMBOL
+		ERROR_SYMBOL,
+		MISSED_LEXEM,
+		REDUN_LEXEM
 	};
 
 	WHAT what;
