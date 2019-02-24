@@ -37,7 +37,6 @@
 #include "analyzer.h"
 
 #define SHOW_HELP          "-h"
-#define PLAY_SOLUTION      "-p"
 #define PLAY_QUESTION      "-q"
 #define MIXED_MODE         "-m"
 #define INVERT_MODE        "-i"
@@ -46,8 +45,8 @@
 #define LANGUAGE_RECOGNIZE "-l"
 #define ENTER_MODE         "-e"
 #define NUMBERS            "-n"
-#define CASE_UNSENS        "-c"
-#define PUNCT_UNSENS       "-u"
+#define CASE_UNSENSETIVE   "-c"
+#define PUNCT_UNSENSETIVE  "-u"
 
 const char * help_message =
 	"-h	show this help\n" \
@@ -70,6 +69,7 @@ namespace an = analysis;
 typedef view::LANGUAGE LAN;
 
 const int REPEAT_TIMES = 2;
+const int TAB_SIZE = 4;
 
 void play(const std::string& phrase)
 {
@@ -128,7 +128,6 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	bool play_solution = params.find(PLAY_SOLUTION) != params.end();
 	bool play_question = params.find(PLAY_QUESTION) != params.end();
 	bool enter_accept_mode = params.find(ENTER_MODE) != params.end();
 	bool invert_mode = params.find(INVERT_MODE) != params.end();
@@ -136,8 +135,8 @@ int main(int argc, char* argv[])
 	bool auto_language = params.find(LANGUAGE_RECOGNIZE) != params.end();
 	bool repeat_errors_only = params.find(REPEAT_ERRORS) != params.end();
 	bool show_statistic = params.find(SHOW_STATISTIC) != params.end();
-	bool case_unsensitive = params.find(CASE_UNSENS) != params.end();
-	bool punct_unsensitive = params.find(PUNCT_UNSENS) != params.end();
+	bool case_unsensitive = params.find(CASE_UNSENSETIVE) != params.end();
+	bool punct_unsensitive = params.find(PUNCT_UNSENSETIVE) != params.end();
 
 	std::vector<Problem> problems = Parser::load(problems_filename, params);
 
@@ -169,7 +168,7 @@ int main(int argc, char* argv[])
 		to_solve.push_back(static_cast<int>(i));
 	}
 
-	view::ncurses::NScreen screen(enter_accept_mode);
+	view::ncurses::NScreen screen(enter_accept_mode, TAB_SIZE);
 	int errors_count = 0, solved_count = 0, solving_num = -1, previous_solving_num = -1;
 
 	auto update_statistic = [&]() {
@@ -251,19 +250,30 @@ int main(int argc, char* argv[])
 			++errors_count;
 		}
 
-		update_statistic();
-		screen.show_result(result);
-		screen.show_solution();
-		screen.show_message("Press space to play question or another key to continue");
-
 		std::string to_play;
+		to_play = problem.solution.front();
 		if (play_question) to_play = problem.question.front();
-		if (play_solution) to_play = problem.solution.front();
 		if (!to_play.empty())
 			play(to_play);
 
-		while (screen.wait_pressed_key() == ' ')
-			play(to_play);
+		while (true) {
+			update_statistic();
+			screen.show_result(result);
+			screen.show_solution();
+			screen.show_message(problem.repeat != 0
+				? "Press space to play question, F3 to skip question or another key to continue"
+				: "Press space to play question or another key to continue");
+
+			int key = screen.wait_pressed_key();
+			if (key == ' ') {
+				play(to_play);
+			} else if (key == view::FKEY::F3 && problem.repeat != 0) {
+				problem.repeat = 0;
+				++solved_count;
+				to_solve.erase(std::remove(to_solve.begin(), to_solve.end(), solving_num), to_solve.end());
+			} else
+				break;
+		}
 	}
 
 	Parser::save_statistic(problems, problems_filename);

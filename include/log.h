@@ -34,7 +34,7 @@ public:
 
 	~Message() {
 		if (uncaught >= std::uncaught_exception())
-			std::cout << stream.str();
+			std::cout << prefix << stream.str();
 	}
 
 	std::stringstream stream;
@@ -65,7 +65,7 @@ public:
 
 template <typename T>
 Message& operator<<(Message& record, T&& t) {
-	record.stream << record.prefix << std::forward<T>(t);
+	record.stream << std::forward<T>(t);
 	return record;
 }
 

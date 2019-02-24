@@ -10,6 +10,7 @@
 #include <window.h>
 #include <utils.h>
 #include <analyzer.h>
+#include <cstring>
 
 namespace view {
 
@@ -122,6 +123,18 @@ void MessageWindow::refresh()
 	wrefresh(window);
 }
 
+static
+std::vector<int> expand_tabs(const std::string& s, int tab_width) {
+	std::vector<int> result;
+	int pos = 0;
+	for (char c: s) {
+		result.push_back(pos);
+		pos += (c != '\t') ? 1 : tab_width - pos % tab_width;
+	}
+
+	return result;
+}
+
 void AnswerWindow::update_screen()
 {
 	clear();
@@ -140,15 +153,17 @@ void AnswerWindow::update_screen()
 		for (const std::string& line: verification.answer) {
 			mvwaddstr(window, y, 0, line.c_str());
 			const auto errors_map_it = verification.errors.find(y);
-			if (errors_map_it != verification.errors.end())
+			if (errors_map_it != verification.errors.end()) {
+				std::vector<int> screen_x = expand_tabs(line, tab_size);
 				for (auto e: errors_map_it->second) {
 					if (e.what == analysis::Error::ERROR_LEXEM)
-						mvwaddstr_colored(y, e.pos, to_utf8(e.str), ERROR_WHITE, false);
+						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), ERROR_WHITE, false);
 					if (e.what == analysis::Error::ERROR_SYMBOL)
-						mvwaddstr_colored(y, e.pos, to_utf8(e.str), ERROR_BLACK, true);
-					if (e.what == analysis::Error::MISSED_LEXEM || e.what == analysis::Error::REDUN_LEXEM)
-						mvwaddstr_colored(y, e.pos, to_utf8(e.str), MISSED_BLACK, true);
+						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), ERROR_BLACK, true);
+					if (e.what == analysis::Error::MISSED || e.what == analysis::Error::REDUNDANT)
+						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), MISSED_BLACK, true);
 				}
+			}
 			++y;
 		}
 
@@ -225,6 +240,8 @@ void AnswerWindow::key_process(int key)
 			update_line();
 			break;
 		default:
+			if (key > KEY_CODE_YES)
+				break;
 			if (key < 0x80) { // one-byte octet
 				editor->add_ch(key);
 			} else {          // two-bytes octet

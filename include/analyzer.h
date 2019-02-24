@@ -34,13 +34,13 @@ struct Error
 	enum WHAT {
 		ERROR_LEXEM,
 		ERROR_SYMBOL,
-		MISSED_LEXEM,
-		REDUN_LEXEM
+		MISSED,
+		REDUNDANT
 	};
 
 	WHAT what;
 	std::u16string str;
-	size_t pos;
+	size_t pos; // position in string
 };
 
 
@@ -50,7 +50,7 @@ struct Verification
 	std::list<std::string> solution;
 
 	int state;
-	// <line, <position_on_screen, string>>
+	// <line, Errors in line>
 	std::map<int, std::list<Error>> errors;
 
 	Verification(const Problem& p, const std::list<std::string>& a)

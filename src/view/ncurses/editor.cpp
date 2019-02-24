@@ -25,12 +25,7 @@ void Editor::update_screen_positions(size_t x, size_t y)
 
 	size_t screen_x = (x > 0) ? screen_positions[y][x - 1] : 0;
 	while(x < lines[y].size()) {
-		if (lines[y][x] == '\t') {
-			size_t next = screen_x + tab_width;
-			screen_x = next - next % tab_width;
-		} else
-			++screen_x;
-
+		screen_x += (lines[y][x] != '\t') ? 1 : tab_width - screen_x % tab_width;
 		size_t w = sym_width(lines[y][x]);
 		for (size_t j = 0; j < w; ++j)
 			screen_positions[y][x + j] = screen_x;

@@ -27,13 +27,11 @@
 #include <mutex>
 #include <thread>
 
-#define TAB_SIZE 4
-
 namespace view {
 
 namespace ncurses {
 
-NScreen::NScreen(bool enter_accept_mode)
+NScreen::NScreen(bool enter_accept_mode, int tab_size)
 	: enter_accept_mode(enter_accept_mode)
 {
 	enum CLR_CODE {
@@ -50,7 +48,7 @@ NScreen::NScreen(bool enter_accept_mode)
 	};
 
 	initscr();
-	set_tabsize(TAB_SIZE);
+	set_tabsize(tab_size);
 	start_color();
 	cbreak();
 	noecho();
@@ -74,7 +72,7 @@ NScreen::NScreen(bool enter_accept_mode)
 
 	window_statistic.reset(new StatisticWindow());
 	window_question.reset(new QuestionWindow());
-	window_answer.reset(new AnswerWindow(std::bind(&NScreen::resize, this), TAB_SIZE));
+	window_answer.reset(new AnswerWindow(std::bind(&NScreen::resize, this), tab_size));
 	window_solution.reset(new SolutionWindow());
 	window_message.reset(new MessageWindow());
 
@@ -84,8 +82,8 @@ NScreen::NScreen(bool enter_accept_mode)
 void NScreen::resize()
 {
 	const int statistic_h = 2, message_h = 1;
-	int ques_h = (LINES - statistic_h - message_h) * 2 / 7;
-	int answ_h = (LINES - statistic_h - ques_h - message_h) / 2;
+	int ques_h = (LINES - statistic_h - message_h) * 2 / 7 - 1;
+	int answ_h = (LINES - statistic_h - ques_h - message_h) / 2 + 1;
 	int resl_h =  LINES - statistic_h - ques_h - message_h - answ_h;
 
 	window_statistic->resize({ .x = 0, .y = 0, .w = COLS, .h = statistic_h });
@@ -145,7 +143,9 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NScreen::get_answer()
 int NScreen::wait_pressed_key()
 {
 	window_answer->focus(true, false);
-	return window_answer->get_key();
+	int key = window_answer->get_key();
+	if (key == KEY_F(3)) return FKEY::F3;
+	return key;
 }
 
 void NScreen::show_result(const analysis::Verification& v)

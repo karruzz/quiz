@@ -43,7 +43,7 @@ TEST (AnalyzeTest, Spelling)
 	EXPECT_EQ ((size_t)2, e.at(1).pos);
 	EXPECT_EQ ("е", to_utf8(e.at(1).str));
 
-	EXPECT_EQ (an::Error::WHAT::ERROR_SYMBOL, e.at(2).what);
+	EXPECT_EQ (an::Error::WHAT::MISSED, e.at(2).what);
 	EXPECT_EQ ((size_t)6, e.at(2).pos);
 	EXPECT_EQ ("...", to_utf8(e.at(2).str));
 }

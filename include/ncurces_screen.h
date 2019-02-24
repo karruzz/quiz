@@ -26,7 +26,7 @@ namespace ncurses {
 class NScreen : public Screen
 {
 public:
-	explicit NScreen(bool enter_accept_mode);
+	explicit NScreen(bool enter_accept_mode, int tab_size);
 	virtual ~NScreen();
 
 	virtual std::tuple<Screen::INPUT_STATE, std::list<std::string>> get_answer();

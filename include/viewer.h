@@ -20,6 +20,10 @@
 
 namespace view {
 
+enum FKEY {
+	F3 = 0xF3F3, // need to prevent dependence from ncurses.h in quiz.cpp
+};
+
 struct Statistic {
 	int left_problems;
 	int solved_problems;

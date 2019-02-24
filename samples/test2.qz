@@ -1,0 +1,4 @@
+> copy from map<int, int> m1 all elements with values < 5 to empty map<int, int> m2
+< std::copy_if(m1.begin(), m1.end(),
+	std::inserter(m2, m2.end()),
+	[](const std::map<int, int>::value_type& p) { return p.second < 5; });

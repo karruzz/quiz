@@ -32,6 +32,7 @@ struct Lexem
 	size_t pos;
 };
 
+#define TAB_WIDTH 4
 
 std::list<Lexem> split_to_lexemes(const std::string& s)
 {
@@ -45,7 +46,7 @@ std::list<Lexem> split_to_lexemes(const std::string& s)
 	size_t position = 0;
 	Lexem::WHAT prev_lexem_type = Lexem::UNDEF, lexem_type = Lexem::UNDEF;
 
-	auto try_to_flush_lexem = [&]() {
+	auto try_to_flush_prev_lexem = [&]() {
 		if (prev_lexem_type != Lexem::UNDEF &&
 				(prev_lexem_type != lexem_type
 				 || prev_lexem_type == Lexem::PUNCT
@@ -61,15 +62,15 @@ std::list<Lexem> split_to_lexemes(const std::string& s)
 	for (const char16_t& c: to_utf16(s)) {
 		if (space_lexems.find(c) != space_lexems.end()) {
 			lexem_type = Lexem::SPACE;
-			try_to_flush_lexem();
+			try_to_flush_prev_lexem();
 			lexem = c;
 		} else if (punctuate_lexems.find(c) != punctuate_lexems.end()) {
 			lexem_type = Lexem::PUNCT;
-			try_to_flush_lexem();
+			try_to_flush_prev_lexem();
 			lexem = c;
 		} else {
 			lexem_type = Lexem::WORD;
-			try_to_flush_lexem();
+			try_to_flush_prev_lexem();
 			lexem.push_back(c);
 		}
 
@@ -140,10 +141,10 @@ Verification Analyzer::check(
 			if (answr != solut) {
 				if (pos != 0 && answr == solut_next) { // lexem missed in answer
 					++solut_lexem;
-					v.errors[line_num].push_back({Error::MISSED_LEXEM, to_utf16(" "), pos - 1});
+					v.errors[line_num].push_back({Error::MISSED, to_utf16(" "), pos - 1});
 				} else if (answr_next == solut) { // redundant lexem in answer
 					++answr_lexem;
-					v.errors[line_num].push_back({Error::REDUN_LEXEM, answr, pos});
+					v.errors[line_num].push_back({Error::REDUNDANT, answr, pos});
 				} else { // error lexem
 					v.errors[line_num].push_back({Error::ERROR_LEXEM, answr, pos});
 
@@ -165,7 +166,7 @@ Verification Analyzer::check(
 		// not full answer
 		if (solut_lexem != solut_lexems.cend()) {
 			v.errors[line_num].push_back(
-				{Error::ERROR_SYMBOL, to_utf16("..."), to_utf16(*answr_line).size()});
+				{Error::MISSED, to_utf16("..."), to_utf16(*answr_line).size()});
 			v.state |= MARK::NOT_FULL_ANSWER;
 		}
 
@@ -173,7 +174,7 @@ Verification Analyzer::check(
 		if (answr_lexem != answr_lexems.cend()) {
 			for (; answr_lexem != answr_lexems.cend(); ++answr_lexem)
 				v.errors[line_num].push_back(
-					{Error::ERROR_SYMBOL, answr_lexem->str, answr_lexem->pos});
+					{Error::REDUNDANT, answr_lexem->str, answr_lexem->pos});
 			v.state |= MARK::REDUNDANT_ANSWER;
 		}
 	}

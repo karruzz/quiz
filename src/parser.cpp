@@ -214,6 +214,7 @@ std::vector<Problem> Parser::load(
 		question_max = std::stoi(params.at(NUMBERS).at(1));
 		question_step = std::stoi(params.at(NUMBERS).at(2));
 	}
+	std::set<std::string> topics_in_quiz;
 	while (std::getline(quiz_ifstream, line)) {
 		prev_state = state;
 		line_type t = get_line_type(line);
@@ -227,6 +228,7 @@ std::vector<Problem> Parser::load(
 		remove_duplicate_spaces(line);
 
 		if (t == LINE_TOPIC) {
+			topics_in_quiz.insert(line);
 			needed_topic = use_topics && topics.find(line) != topics.end();
 			continue;
 		} else if (t == LINE_SOLUTION) {
@@ -317,6 +319,18 @@ std::vector<Problem> Parser::load(
 			p.last_errors = mit->second.last_errors;
 		}
 	}
+
+	if (use_topics)
+		std::for_each(topics.cbegin(), topics.cend(), [&topics_in_quiz] (const std::string& s) {
+			bool any_lost_topics = false;
+			if (topics_in_quiz.find(s) == topics_in_quiz.end()) {
+				logging::Error() << "Topic <" + s + "> not found in quiz" << logging::endl;
+				any_lost_topics = true;
+			}
+			if (any_lost_topics)
+				throw std::runtime_error("not all topics were found in quiz, check command line arguments");
+		}
+	);
 
 	return problems;
 }
