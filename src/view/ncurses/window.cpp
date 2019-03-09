@@ -124,12 +124,13 @@ void MessageWindow::refresh()
 }
 
 static
-std::vector<int> expand_tabs(const std::string& s, int tab_width) {
-	std::vector<int> result;
+std::vector<int> expand_tabs(const std::string& s, int tab_width)
+{
 	int pos = 0;
+	std::vector<int> result = { pos };
 	for (char c: s) {
+		pos += (c != '\t') ? 1 : (tab_width - pos % tab_width);
 		result.push_back(pos);
-		pos += (c != '\t') ? 1 : tab_width - pos % tab_width;
 	}
 
 	return result;
