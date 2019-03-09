@@ -150,6 +150,7 @@ int NScreen::wait_pressed_key()
 
 void NScreen::show_result(const analysis::Verification& v)
 {
+	window_solution->show_analysed(v);
 	window_answer->show_analysed(v);
 }
 

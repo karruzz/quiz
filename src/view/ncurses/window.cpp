@@ -136,7 +136,7 @@ std::vector<int> expand_tabs(const std::string& s, int tab_width)
 	return result;
 }
 
-void AnswerWindow::update_screen()
+void AnswerWindow::update_window()
 {
 	clear();
 	const std::vector<std::string>& answer = editor->get_lines();
@@ -157,7 +157,7 @@ void AnswerWindow::update_screen()
 			if (errors_map_it != verification.errors.end()) {
 				std::vector<int> screen_x = expand_tabs(line, tab_size);
 				for (auto e: errors_map_it->second) {
-					if (e.what == analysis::Error::ERROR_LEXEM)
+					if (e.what == analysis::Error::ERROR_TOKEN)
 						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), ERROR_WHITE, false);
 					if (e.what == analysis::Error::ERROR_SYMBOL)
 						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), ERROR_BLACK, true);
@@ -194,7 +194,7 @@ void AnswerWindow::update_line()
 
 void AnswerWindow::refresh()
 {
-	update_screen();
+	update_window();
 	wmove(window, editor->get_screen_y(), editor->get_screen_x());
 	wrefresh(window);
 }
@@ -203,10 +203,10 @@ void AnswerWindow::key_process(int key)
 {
 	switch (key) {
 		case KEY_BACKSPACE:
-			editor->backspace() ? update_screen() : update_line();
+			editor->backspace() ? update_window() : update_line();
 			break;
 		case KEY_DC:
-			editor->del() ? update_screen() : update_line();
+			editor->del() ? update_window() : update_line();
 			break;
 		case KEY_HOME:
 			editor->home();
@@ -234,10 +234,10 @@ void AnswerWindow::key_process(int key)
 			break;
 		case '\n':
 			editor->new_line();
-			update_screen();
+			update_window();
 			break;
 		case KEY_F(4):
-			editor->add_str(audio_record.capture());
+			editor->add_str(AudioRecord::capture());
 			update_line();
 			break;
 		default:
@@ -268,13 +268,13 @@ void AnswerWindow::prepare() {
 	mode = Mode::INPUT;
 	editor.reset(new Editor(tab_size));
 	update_cursor({ editor->get_screen_x(), editor->get_screen_y() });
-	update_screen();
+	update_window();
 }
 
 void AnswerWindow::show_analysed(const analysis::Verification& v) {
 	mode = Mode::OUTPUT;
 	verification = v;
-	update_screen();
+	update_window();
 }
 
 std::list<std::string> AnswerWindow::get_lines()

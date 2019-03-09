@@ -14,7 +14,8 @@
 
 class AudioRecord {
 public:
-	std::string capture();
+	static std::string capture();
+	static void play(const std::string& phrase);
 };
 
 #endif // RECORD_H

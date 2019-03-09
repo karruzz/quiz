@@ -35,7 +35,7 @@ TEST (AnalyzeTest, Spelling)
 
 	EXPECT_EQ (an::MARK::ERROR | an::MARK::NOT_FULL_ANSWER, v.state);
 
-	EXPECT_EQ (an::Error::WHAT::ERROR_LEXEM, e.at(0).what);
+	EXPECT_EQ (an::Error::WHAT::ERROR_TOKEN, e.at(0).what);
 	EXPECT_EQ ((size_t)0, e.at(0).pos);
 	EXPECT_EQ ("превет", to_utf8(e.at(0).str));
 

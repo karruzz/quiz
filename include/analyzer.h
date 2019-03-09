@@ -28,11 +28,28 @@ enum MARK {
 	ERROR                = 0x8
 };
 
+struct Token
+{
+	enum WHAT {
+		UNDEF,
+		WORD,
+		SPACE,
+		PUNCT
+	};
+
+	WHAT what;
+	std::u16string str;
+	size_t pos;
+
+	bool operator<(const Token& l) {
+		return str.compare(l.str);
+	}
+};
 
 struct Error
 {
 	enum WHAT {
-		ERROR_LEXEM,
+		ERROR_TOKEN,
 		ERROR_SYMBOL,
 		MISSED,
 		REDUNDANT
@@ -72,10 +89,13 @@ public:
 		NONE              = 0x0,
 		CASE_UNSENSITIVE  = 0x1,
 		PUNCT_UNSENSITIVE = 0x2,
+		TOTAL_RECALL      = 0x4
 	};
 
 	Verification check(
 		const Problem& problem, const std::list<std::string>& answer, int flags);
+
+	static std::list<Token> split_to_tokens(const std::string& s);
 };
 
 } // namespace analyze

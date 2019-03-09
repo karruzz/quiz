@@ -1,4 +1,6 @@
 #include <voice.h>
+#include <analyzer.h>
+#include <utils.h>
 
 #ifdef AUDIO_CAPTURE
 #include <pocketsphinx/pocketsphinx.h>
@@ -71,4 +73,25 @@ std::string AudioRecord::capture()
 #else
 	return "";
 #endif
+}
+
+void AudioRecord::play(const std::string& phrase)
+{
+	static char audio_play_cmd[100];
+	if (phrase.empty()) return;
+
+	std::list<analysis::Token> tokens = analysis::Analyzer::split_to_tokens(phrase);
+	std::string expanded;
+	for (const analysis::Token &l : tokens) {
+		if (l.what != analysis::Token::WHAT::WORD)
+			continue;
+
+		std::string word = to_utf8(l.str);
+		if (word == "sb") word = "somebody";
+		else if (word == "sth") word = "something";
+		expanded.append(word + ' ');
+	}
+
+	sprintf(audio_play_cmd, "spd-say \"%s\"", expanded.c_str());
+	system(audio_play_cmd);
 }

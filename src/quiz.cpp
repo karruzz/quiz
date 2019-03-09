@@ -37,6 +37,7 @@
 #include "analyzer.h"
 
 #define SHOW_HELP          "-h"
+#define PLAY_SOLUTION      "-p"
 #define PLAY_QUESTION      "-q"
 #define MIXED_MODE         "-m"
 #define INVERT_MODE        "-i"
@@ -47,6 +48,7 @@
 #define NUMBERS            "-n"
 #define CASE_UNSENSETIVE   "-c"
 #define PUNCT_UNSENSETIVE  "-u"
+#define TOTAL_RECALLD      "-z"
 
 const char * help_message =
 	"-h	show this help\n" \
@@ -60,7 +62,8 @@ const char * help_message =
 	"-e	accept answer by enter key\n" \
 	"-t	use topics\n" \
 	"-c	case unsensitive\n" \
-	"-u	punctuation unsensitive\n";
+	"-u	punctuation unsensitive\n"
+	"-z	total recall\n";
 
 namespace {
 
@@ -70,14 +73,6 @@ typedef view::LANGUAGE LAN;
 
 const int REPEAT_TIMES = 2;
 const int TAB_SIZE = 4;
-
-void play(const std::string& phrase)
-{
-	static char audio_play_cmd[100];
-	if (phrase.empty()) return;
-	sprintf(audio_play_cmd, "spd-say \"%s\"", phrase.c_str());
-	system(audio_play_cmd);
-}
 
 void set_os_lang(LAN language)
 {
@@ -128,6 +123,7 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
+	bool play_solution = params.find(PLAY_SOLUTION) != params.end();
 	bool play_question = params.find(PLAY_QUESTION) != params.end();
 	bool enter_accept_mode = params.find(ENTER_MODE) != params.end();
 	bool invert_mode = params.find(INVERT_MODE) != params.end();
@@ -137,6 +133,7 @@ int main(int argc, char* argv[])
 	bool show_statistic = params.find(SHOW_STATISTIC) != params.end();
 	bool case_unsensitive = params.find(CASE_UNSENSETIVE) != params.end();
 	bool punct_unsensitive = params.find(PUNCT_UNSENSETIVE) != params.end();
+	bool total_recall = params.find(TOTAL_RECALLD) != params.end();
 
 	std::vector<Problem> problems = Parser::load(problems_filename, params);
 
@@ -233,8 +230,9 @@ int main(int argc, char* argv[])
 
 		problem.was_attempt = true;
 		int flags = an::Analyzer::NONE;
-		if (case_unsensitive) flags |= an::Analyzer::CASE_UNSENSITIVE;
-		if (punct_unsensitive) flags |= an::Analyzer::PUNCT_UNSENSITIVE;
+		if (case_unsensitive) flags |= an::Analyzer::OPTIONS::CASE_UNSENSITIVE;
+		if (punct_unsensitive) flags |= an::Analyzer::OPTIONS::PUNCT_UNSENSITIVE;
+		if (total_recall) flags |= an::Analyzer::OPTIONS::TOTAL_RECALL;
 		an::Verification result = analyzer.check(problem, answer, flags);
 
 		if (result.state == an::MARK::RIGHT) {
@@ -251,10 +249,10 @@ int main(int argc, char* argv[])
 		}
 
 		std::string to_play;
-		to_play = problem.solution.front();
+		if (play_solution) to_play = problem.solution.front();
 		if (play_question) to_play = problem.question.front();
 		if (!to_play.empty())
-			play(to_play);
+			AudioRecord::play(to_play);
 
 		while (true) {
 			update_statistic();
@@ -266,7 +264,7 @@ int main(int argc, char* argv[])
 
 			int key = screen.wait_pressed_key();
 			if (key == ' ') {
-				play(to_play);
+				AudioRecord::play(to_play);
 			} else if (key == view::FKEY::F3 && problem.repeat != 0) {
 				problem.repeat = 0;
 				++solved_count;

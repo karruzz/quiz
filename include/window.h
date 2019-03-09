@@ -117,13 +117,12 @@ public:
 
 class AnswerWindow : public CursorWindow
 {
-	AudioRecord audio_record;
 	int tab_size;
 	std::unique_ptr<Editor> editor;
 
 	analysis::Verification verification;
 
-	void update_screen();
+	void update_window();
 	void update_line();
 
 public:
@@ -181,6 +180,10 @@ public:
 	void show(bool e) {
 		visible = e;
 		refresh();
+	}
+
+	void show_analysed(const analysis::Verification& v) {
+		solution = v.solution;
 	}
 
 	void update(const Problem& p) {
