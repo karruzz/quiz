@@ -9,10 +9,13 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <map>
 
 #include <cwctype>
 
 #include <utils.h>
+
+namespace utils {
 
 void trim_spaces(std::string &s)
 {
@@ -78,3 +81,29 @@ std::string to_utf8(const std::u16string& in)
 	}
 	return out;
 }
+
+LANGUAGE what_language(const std::u16string& s) {
+	std::map<LANGUAGE, int> langs ;
+	for (char16_t c: s) {
+		if (c >= 0x0410 && c < 0x044F) {
+			langs[LANGUAGE::RU]++;
+		} else if (c >= 0x0041 && c < 0x007a) {
+			langs[LANGUAGE::EN]++;
+		} else {
+			langs[LANGUAGE::UNKNOWN]++;
+		}
+	}
+
+	int max = 0;
+	LANGUAGE result = LANGUAGE::UNKNOWN;
+	for (auto p: langs) {
+		if (p.second > max) {
+			max = p.second;
+			result = p.first;
+		}
+	}
+
+	return result;
+}
+
+} // namespace utils

@@ -53,6 +53,13 @@ if (audio)
 	)
 endif()
 
+if (spd-say)
+	target_compile_options(quiz PUBLIC -DSPD_SAY)
+elseif (google_speech)
+	target_compile_options(quiz PUBLIC -DGOOGLE_SPEECH)
+endif()
+
+
 # *********************** tests ************************
 
 #set GTEST_DIR variable to  "your_path/Gtest/googletest"
@@ -82,3 +89,6 @@ if (GTEST_DIR)
 			pthread
 	)
 endif()
+
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+

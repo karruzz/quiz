@@ -16,8 +16,8 @@
 /* problem example:
  *
  * % stdio    -> theme
- * # todo: check POSIX 2008
- * ^ tmpnam   -> tag
+ * # todo: check POSIX 2008 -> comment
+ * ^ tmpnam   -> tag (deprecated)
  * > create a name for a temporary file, show using headers   -> question
  * < stdio.h  --> solution
 		 char *str = tmpnam(NULL);
@@ -34,25 +34,19 @@ struct Problem {
 	std::list<std::string> solution;
 	size_t question_hash = 0;
 
-	int repeat = 0;
+	int repeat = 1;
 	int total_errors = 0;
 	int last_errors = 0;
 	int errors = 0;
 
 	bool was_attempt = false;
 	bool inverted = false;
+	bool not_show_question = false;
 
 	Problem(const std::list<std::string> &q,
 		const std::list<std::string> &s)
 		: question(q)
 		, solution(s)
-		, question_hash(0)
-		, repeat(1)
-		, total_errors(0)
-		, last_errors(0)
-		, errors(0)
-		, was_attempt(false)
-		, inverted(false)
 	{}
 
 	Problem() = default;

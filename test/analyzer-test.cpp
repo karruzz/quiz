@@ -37,15 +37,15 @@ TEST (AnalyzeTest, Spelling)
 
 	EXPECT_EQ (an::Error::WHAT::ERROR_TOKEN, e.at(0).what);
 	EXPECT_EQ ((size_t)0, e.at(0).pos);
-	EXPECT_EQ ("превет", to_utf8(e.at(0).str));
+	EXPECT_EQ ("превет", utils::to_utf8(e.at(0).str));
 
 	EXPECT_EQ (an::Error::WHAT::ERROR_SYMBOL, e.at(1).what);
 	EXPECT_EQ ((size_t)2, e.at(1).pos);
-	EXPECT_EQ ("е", to_utf8(e.at(1).str));
+	EXPECT_EQ ("е", utils::to_utf8(e.at(1).str));
 
 	EXPECT_EQ (an::Error::WHAT::MISSED, e.at(2).what);
 	EXPECT_EQ ((size_t)6, e.at(2).pos);
-	EXPECT_EQ ("...", to_utf8(e.at(2).str));
+	EXPECT_EQ ("...", utils::to_utf8(e.at(2).str));
 }
 
 TEST (AnalyzeTest, Punctuation)

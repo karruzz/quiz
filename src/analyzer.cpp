@@ -18,79 +18,78 @@ namespace analysis {
 
 #define TAB_WIDTH 4
 
-std::list<Token> Analyzer::split_to_tokens(const std::string& s)
+static
+Token::WHAT what_token(char16_t c)
 {
 	static const std::set<char16_t> space_tokens = { ' ', '\t' };
 	static const std::set<char16_t> punctuate_tokens
 		= { ',', '.', '?', '!', '-', ':', ';', '_', '(', ')',
 			'[', ']', '<', '>', '{', '}', '+', '-', '=', '*', '/' };
+	static const std::set<char16_t> delimeter_tokens
+		= { ',', '.', '?', '!', ':', ';' };
 
+	if (space_tokens.find(c) != space_tokens.end())
+		return Token::SPACE;
+
+	if (punctuate_tokens.find(c) != punctuate_tokens.end()) {
+		int result = Token::PUNCT;
+		if (delimeter_tokens.find(c) != delimeter_tokens.end())
+			result |= Token::DELIM;
+		return (Token::WHAT)result;
+	}
+
+	return Token::WORD;
+}
+
+std::list<Token> Analyzer::split_to_tokens(const std::string& s)
+{
 	std::list<Token> tokens;
+	if (s.empty()) return tokens;
+
 	std::u16string token_str;
 	size_t position = 0;
-	Token::WHAT prev_token_type = Token::UNDEF, token_type = Token::UNDEF;
 
-	auto try_to_flush_prev_token = [&]() {
-		if (prev_token_type != Token::UNDEF &&
-				(prev_token_type != token_type
-				 || prev_token_type == Token::PUNCT
-				 || prev_token_type == Token::SPACE)
-			)
-		{
-			tokens.push_back({ prev_token_type, token_str, position});
+	std::u16string line = utils::to_utf16(s);
+	std::u16string::iterator c = line.begin(), next = std::next(line.begin());
+	for (; c != line.end(); ++c, ++next) {
+		Token::WHAT token_type = what_token(*c);
+		if (token_type == Token::WORD)
+			token_str.push_back(*c);
+		else
+			token_str = *c;
+
+		Token::WHAT token_type_next = next != line.end() ? what_token(*next) : Token::UNDEF;
+		if (token_type != token_type_next) {
+			tokens.push_back({ token_type, token_str, position});
 			position += token_str.length();
 			token_str.clear();
 		}
-	};
-
-	for (const char16_t& c: to_utf16(s)) {
-		if (space_tokens.find(c) != space_tokens.end()) {
-			token_type = Token::SPACE;
-			try_to_flush_prev_token();
-			token_str = c;
-		} else if (punctuate_tokens.find(c) != punctuate_tokens.end()) {
-			token_type = Token::PUNCT;
-			try_to_flush_prev_token();
-			token_str = c;
-		} else {
-			token_type = Token::WORD;
-			try_to_flush_prev_token();
-			token_str.push_back(c);
-		}
-
-		prev_token_type = token_type;
 	}
-
-	// final token
-	if (!token_str.empty())
-		tokens.push_back({ token_type, token_str, position });
 
 	return tokens;
 }
 
 static
-
 Verification total_recall_check(Verification& v, int flags)
 {
 	std::set<std::string> recall_answ_set;
 	std::set<std::string> recall_solut_set;
 
 	auto remove_space = [](const Token& l){ return l.what == Token::SPACE; };
-	auto downcase = [](Token& l) { to_lower(l.str); return l; };
+	auto downcase = [](Token& l) { utils::to_lower(l.str); return l; };
 	auto split_to_phrases = [] (std::set<std::string>& set, const std::list<Token>& tokens) {
 		std::string phrase;
-		for (auto l: tokens) {
-			if (l.what == Token::WHAT::PUNCT) {
-				if (phrase.back() == ' ') phrase.pop_back();
+		std::list<Token>::const_iterator it = tokens.begin(), next = std::next(tokens.begin());
+		for (; it != tokens.end(); ++it, ++next) {
+			if (it->what & Token::WHAT::DELIM)
+				continue;
+
+			phrase.append(utils::to_utf8(it->str));
+			if (next == tokens.end() || (next->what & Token::WHAT::DELIM)) {
+				utils::trim_spaces(phrase);
 				set.insert(phrase);
 				phrase.clear();
-			} else {
-				phrase.append(to_utf8(l.str) + ' ');
 			}
-		}
-		if (!phrase.empty()) {
-			if (phrase.back() == ' ') phrase.pop_back();
-			set.insert(phrase);
 		}
 	};
 
@@ -99,8 +98,7 @@ Verification total_recall_check(Verification& v, int flags)
 			(std::set<std::string>& set, const std::list<std::string> &lines)
 	{
 		for (auto line = lines.cbegin(); line != lines.cend(); ++line) {
-			auto tokens = Analyzer::split_to_tokens(*line);
-			tokens.remove_if(remove_space);
+			std::list<Token> tokens = Analyzer::split_to_tokens(*line);
 
 			if (flags & Analyzer::OPTIONS::CASE_UNSENSITIVE)
 				std::transform(tokens.begin(), tokens.end(), tokens.begin(), downcase);
@@ -157,8 +155,8 @@ Verification Analyzer::check(
 	Verification v(problem, answer);
 	v.answer.remove("");
 
-	std::for_each(v.answer.begin(), v.answer.end(), trim_spaces);
-	std::for_each(v.answer.begin(), v.answer.end(), remove_duplicate_spaces);
+	std::for_each(v.answer.begin(), v.answer.end(), utils::trim_spaces);
+	std::for_each(v.answer.begin(), v.answer.end(), utils::remove_duplicate_spaces);
 
 	if (flags & OPTIONS::TOTAL_RECALL)
 		return total_recall_check(v, flags);
@@ -177,13 +175,13 @@ Verification Analyzer::check(
 		solut_tokens.remove_if(remove_space);
 
 		if (flags & OPTIONS::CASE_UNSENSITIVE) {
-			auto downcase = [](Token& l) { to_lower(l.str); return l; };
+			auto downcase = [](Token& l) { utils::to_lower(l.str); return l; };
 			std::transform(answr_tokens.begin(), answr_tokens.end(), answr_tokens.begin(), downcase);
 			std::transform(solut_tokens.begin(), solut_tokens.end(), solut_tokens.begin(), downcase);
 		}
 
 		if (flags & OPTIONS::PUNCT_UNSENSITIVE) {
-			auto remove_punctuation = [](const Token& l){ return l.what == Token::PUNCT; };
+			auto remove_punctuation = [](const Token& l){ return l.what & Token::PUNCT; };
 			answr_tokens.remove_if(remove_punctuation);
 			solut_tokens.remove_if(remove_punctuation);
 		}
@@ -210,7 +208,7 @@ Verification Analyzer::check(
 			if (answr != solut) {
 				if (pos != 0 && answr == solut_next) { // token missed in answer
 					++solut_token;
-					v.errors[line_num].push_back({Error::MISSED, to_utf16(" "), pos - 1});
+					v.errors[line_num].push_back({Error::MISSED, utils::to_utf16(" "), pos - 1});
 				} else if (answr_next == solut) { // redundant token in answer
 					++answr_token;
 					v.errors[line_num].push_back({Error::REDUNDANT, answr, pos});
@@ -235,7 +233,7 @@ Verification Analyzer::check(
 		// not full answer
 		if (solut_token != solut_tokens.cend()) {
 			v.errors[line_num].push_back(
-				{Error::MISSED, to_utf16("..."), to_utf16(*answr_line).size()});
+				{Error::MISSED, utils::to_utf16("..."), utils::to_utf16(*answr_line).size()});
 			v.state |= MARK::NOT_FULL_ANSWER;
 		}
 

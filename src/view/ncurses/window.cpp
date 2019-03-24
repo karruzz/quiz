@@ -158,11 +158,11 @@ void AnswerWindow::update_window()
 				std::vector<int> screen_x = expand_tabs(line, tab_size);
 				for (auto e: errors_map_it->second) {
 					if (e.what == analysis::Error::ERROR_TOKEN)
-						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), ERROR_WHITE, false);
+						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), ERROR_WHITE, false);
 					if (e.what == analysis::Error::ERROR_SYMBOL)
-						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), ERROR_BLACK, true);
+						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), ERROR_BLACK, true);
 					if (e.what == analysis::Error::MISSED || e.what == analysis::Error::REDUNDANT)
-						mvwaddstr_colored(y, screen_x[e.pos], to_utf8(e.str), MISSED_BLACK, true);
+						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), MISSED_BLACK, true);
 				}
 			}
 			++y;
@@ -236,7 +236,7 @@ void AnswerWindow::key_process(int key)
 			editor->new_line();
 			update_window();
 			break;
-		case KEY_F(4):
+		case KEY_F(6):
 			editor->add_str(AudioRecord::capture());
 			update_line();
 			break;
@@ -274,7 +274,7 @@ void AnswerWindow::prepare() {
 void AnswerWindow::show_analysed(const analysis::Verification& v) {
 	mode = Mode::OUTPUT;
 	verification = v;
-	update_window();
+	refresh();
 }
 
 std::list<std::string> AnswerWindow::get_lines()

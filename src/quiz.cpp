@@ -38,7 +38,7 @@
 
 #define SHOW_HELP          "-h"
 #define PLAY_SOLUTION      "-p"
-#define PLAY_QUESTION      "-q"
+#define NOT_SHOW_QUESTION  "-q"
 #define MIXED_MODE         "-m"
 #define INVERT_MODE        "-i"
 #define SHOW_STATISTIC     "-s"
@@ -49,11 +49,14 @@
 #define CASE_UNSENSETIVE   "-c"
 #define PUNCT_UNSENSETIVE  "-u"
 #define TOTAL_RECALLD      "-z"
+#define READ_QUESTION      "-w"
+
+// todo: voice refactor
 
 const char * help_message =
 	"-h	show this help\n" \
 	"-p	play the solution\n" \
-	"-q	play the question\n" \
+	"-q	not show question\n" \
 	"-m	mixed mode, question and solution may be swapped\n" \
 	"-i	invert questions and solutions, discard mixed mode (-m)\n" \
 	"-s	show statistic\n" \
@@ -63,13 +66,14 @@ const char * help_message =
 	"-t	use topics\n" \
 	"-c	case unsensitive\n" \
 	"-u	punctuation unsensitive\n"
-	"-z	total recall\n";
+	"-z	total recall\n" \
+	"-w	read question but not show it\n";
 
 namespace {
 
 namespace an = analysis;
 
-typedef view::LANGUAGE LAN;
+typedef utils::LANGUAGE LAN;
 
 const int REPEAT_TIMES = 2;
 const int TAB_SIZE = 4;
@@ -124,16 +128,24 @@ int main(int argc, char* argv[])
 	}
 
 	bool play_solution = params.find(PLAY_SOLUTION) != params.end();
-	bool play_question = params.find(PLAY_QUESTION) != params.end();
 	bool enter_accept_mode = params.find(ENTER_MODE) != params.end();
 	bool invert_mode = params.find(INVERT_MODE) != params.end();
 	bool mixed_mode = params.find(MIXED_MODE) != params.end() && !invert_mode;
 	bool auto_language = params.find(LANGUAGE_RECOGNIZE) != params.end();
 	bool repeat_errors_only = params.find(REPEAT_ERRORS) != params.end();
 	bool show_statistic = params.find(SHOW_STATISTIC) != params.end();
-	bool case_unsensitive = params.find(CASE_UNSENSETIVE) != params.end();
-	bool punct_unsensitive = params.find(PUNCT_UNSENSETIVE) != params.end();
-	bool total_recall = params.find(TOTAL_RECALLD) != params.end();
+	bool read_question = params.find(READ_QUESTION) != params.end();
+	bool not_show_question = params.find(NOT_SHOW_QUESTION) != params.end();
+
+	int analyze_flags = an::Analyzer::NONE;
+	if (params.find(CASE_UNSENSETIVE) != params.end())
+		analyze_flags |= an::Analyzer::OPTIONS::CASE_UNSENSITIVE;
+
+	if (params.find(PUNCT_UNSENSETIVE) != params.end())
+		analyze_flags |= an::Analyzer::OPTIONS::PUNCT_UNSENSITIVE;
+
+	if (params.find(TOTAL_RECALLD) != params.end())
+		analyze_flags |= an::Analyzer::OPTIONS::TOTAL_RECALL;
 
 	std::vector<Problem> problems = Parser::load(problems_filename, params);
 
@@ -189,17 +201,28 @@ int main(int argc, char* argv[])
 		previous_solving_num = solving_num;
 
 		Problem& problem = problems[solving_num];
-		if (invert_mode)
-			problem.inverted = true;
+		problem.inverted = invert_mode;
+		problem.not_show_question = not_show_question;
 
 		if (mixed_mode) {
-			std::uniform_int_distribution<> distribution (0, 1);
+			static std::uniform_int_distribution<> distribution (0, 1);
 			problem.inverted = distribution(generator) == 0;
-			if (auto_language) {
-				LAN language = problem.inverted ? LAN::RU : LAN::EN;
-				set_os_lang(language);
-				screen.set_language(language);
-			}
+		}
+
+		auto q = problem.inverted ? problem.solution : problem.question;
+		auto s = problem.inverted ? problem.question : problem.solution;
+		std::ostringstream imploded_q;
+		std::copy(q.begin(), q.end(), std::ostream_iterator<std::string>(imploded_q, " "));
+		std::string question_joined = imploded_q.str();
+
+		std::ostringstream imploded_s;
+		std::copy(s.begin(), s.end(), std::ostream_iterator<std::string>(imploded_s, " "));
+		std::string solution_joined = imploded_s.str();
+
+		if (auto_language) {
+			LAN language = utils::what_language(utils::to_utf16(solution_joined));
+			set_os_lang(language);
+			screen.set_language(language);
 		}
 
 		view::Screen::INPUT_STATE input_state;
@@ -208,6 +231,8 @@ int main(int argc, char* argv[])
 		try {
 			update_statistic();
 			screen.show_problem(problem);
+			if (read_question)
+				AudioRecord::play(question_joined);
 			std::tie(input_state, answer) = screen.get_answer();
 		} catch(const std::exception &e) {
 			logging::Error() << e.what() << logging::endl;
@@ -229,11 +254,7 @@ int main(int argc, char* argv[])
 		}
 
 		problem.was_attempt = true;
-		int flags = an::Analyzer::NONE;
-		if (case_unsensitive) flags |= an::Analyzer::OPTIONS::CASE_UNSENSITIVE;
-		if (punct_unsensitive) flags |= an::Analyzer::OPTIONS::PUNCT_UNSENSITIVE;
-		if (total_recall) flags |= an::Analyzer::OPTIONS::TOTAL_RECALL;
-		an::Verification result = analyzer.check(problem, answer, flags);
+		an::Verification result = analyzer.check(problem, answer, analyze_flags);
 
 		if (result.state == an::MARK::RIGHT) {
 			--problem.repeat;
@@ -248,23 +269,20 @@ int main(int argc, char* argv[])
 			++errors_count;
 		}
 
-		std::string to_play;
-		if (play_solution) to_play = problem.solution.front();
-		if (play_question) to_play = problem.question.front();
-		if (!to_play.empty())
-			AudioRecord::play(to_play);
+		if (play_solution)
+			AudioRecord::play(solution_joined);
 
 		while (true) {
 			update_statistic();
 			screen.show_result(result);
-			screen.show_solution();
 			screen.show_message(problem.repeat != 0
-				? "Press space to play question, F3 to skip question or another key to continue"
-				: "Press space to play question or another key to continue");
+				? "Press space to play the question, F3 to skip it or another key to continue..."
+				: "Press space to play the question or another key to continue...");
 
 			int key = screen.wait_pressed_key();
 			if (key == ' ') {
-				AudioRecord::play(to_play);
+				AudioRecord::play(solution_joined);
+				continue;
 			} else if (key == view::FKEY::F3 && problem.repeat != 0) {
 				problem.repeat = 0;
 				++solved_count;
@@ -276,7 +294,7 @@ int main(int argc, char* argv[])
 
 	Parser::save_statistic(problems, problems_filename);
 	update_statistic();
-	screen.show_message("All problems solved, press eny key to exit");
+	screen.show_message("All problems are solved, press eny key to exit");
 	screen.wait_pressed_key();
 	return 0;
 }

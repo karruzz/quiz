@@ -1,6 +1,7 @@
 #include <voice.h>
 #include <analyzer.h>
 #include <utils.h>
+#include <log.h>
 
 #ifdef AUDIO_CAPTURE
 #include <pocketsphinx/pocketsphinx.h>
@@ -9,6 +10,8 @@
 #include <sphinxbase/cmd_ln.h>
 #include <cstdio>
 #include <cstring>
+#include <thread>
+#include <functional>
 
 #define SIZE 32000
 
@@ -75,23 +78,42 @@ std::string AudioRecord::capture()
 #endif
 }
 
+static
+void play_string(std::string s)
+{
+	try {
+		if (s.empty()) return;
+
+		std::list<analysis::Token> tokens = analysis::Analyzer::split_to_tokens(s);
+		std::string expanded;
+		for (const analysis::Token &l : tokens) {
+			if (l.what != analysis::Token::WHAT::WORD)
+				continue;
+
+			std::string word = utils::to_utf8(l.str);
+			if (word == "sb" || word == "smb") word = "somebody";
+			else if (word == "sth" || word == "smth") word = "something";
+			expanded.append(word + ' ');
+		}
+
+		static char audio_play_cmd[100];
+#ifdef SPD_SAY
+		sprintf(audio_play_cmd, "spd-say \"%s\"", expanded.c_str());
+#elif defined GOOGLE_SPEECH
+		utils::LANGUAGE lan = utils::what_language(utils::to_utf16(s));
+		std::string l = "en";
+		if (lan == utils::LANGUAGE::RU)
+			l = "ru";
+		sprintf(audio_play_cmd, "google_speech -l %s \"%s\" > /dev/null 2>&1", l.c_str(), expanded.c_str());
+#endif
+		system(audio_play_cmd);
+	} catch (const std::exception &e) {
+		logging::Error() << "Exception in voice thread: " << e.what() << logging::endl;
+	}
+}
+
 void AudioRecord::play(const std::string& phrase)
 {
-	static char audio_play_cmd[100];
-	if (phrase.empty()) return;
-
-	std::list<analysis::Token> tokens = analysis::Analyzer::split_to_tokens(phrase);
-	std::string expanded;
-	for (const analysis::Token &l : tokens) {
-		if (l.what != analysis::Token::WHAT::WORD)
-			continue;
-
-		std::string word = to_utf8(l.str);
-		if (word == "sb") word = "somebody";
-		else if (word == "sth") word = "something";
-		expanded.append(word + ' ');
-	}
-
-	sprintf(audio_play_cmd, "spd-say \"%s\"", expanded.c_str());
-	system(audio_play_cmd);
+	std::thread t(std::bind(play_string, phrase));
+	t.detach();
 }

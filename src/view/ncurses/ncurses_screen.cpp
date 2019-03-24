@@ -109,21 +109,20 @@ void NScreen::show_problem(const Problem& problem)
 {
 	current_problem = problem;
 	window_solution->update(problem);
-	window_solution->show(false);
+	window_solution->visibility(false);
 	window_question->update(problem);
 	window_answer->prepare();
 	window_answer->focus(true);
+	window_message->update("F2 - check answer       F3 - skip question       F12 - exit ");
 }
 
-void NScreen::set_language(LANGUAGE language)
+void NScreen::set_language(utils::LANGUAGE language)
 {
 	window_message->set_lan(language);
 }
 
 std::tuple<Screen::INPUT_STATE, std::list<std::string>> NScreen::get_answer()
 {
-	window_message->update("F2 - check answer       F3 - skip question       F10 - exit ");
-
 	for (;;) {
 		int key = window_answer->get_key();
 
@@ -131,13 +130,13 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NScreen::get_answer()
 			return std::make_tuple(Screen::INPUT_STATE::ENTERED, window_answer->get_lines());
 		else if (key == KEY_F(3))
 			return std::make_tuple(Screen::INPUT_STATE::SKIPPED, std::list<std::string>());
-		else if (key == KEY_F(10))
+		else if (key == KEY_F(12))
 			return std::make_tuple(Screen::INPUT_STATE::EXIT, std::list<std::string>());
 		else
 			window_answer->key_process(key);
 	}
 
-	window_message->set_lan(LANGUAGE::UNKNOWN);
+	window_message->set_lan(utils::LANGUAGE::UNKNOWN);
 }
 
 int NScreen::wait_pressed_key()
@@ -150,13 +149,13 @@ int NScreen::wait_pressed_key()
 
 void NScreen::show_result(const analysis::Verification& v)
 {
-	window_solution->show_analysed(v);
+	window_solution->visibility(true);
 	window_answer->show_analysed(v);
 }
 
 void NScreen::show_solution()
 {
-	window_solution->show(true);
+	window_solution->visibility(true);
 }
 
 void NScreen::show_message(const std::string& msg)

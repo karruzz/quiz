@@ -119,7 +119,7 @@ std::map<size_t, Statistic> load_statistic(const fs::path& quiz_path)
 
 		char line_type = line.at(0);
 		trim_type(line);
-		trim_spaces(line);
+		utils::trim_spaces(line);
 
 		if (line_type == HASH) {
 			question_hash_line = line;
@@ -224,8 +224,8 @@ std::vector<Problem> Parser::load(
 
 		// prepare line
 		if (t != LINE_NO_TYPE) trim_type(line);
-		trim_spaces(line);
-		remove_duplicate_spaces(line);
+		utils::trim_spaces(line);
+		utils::remove_duplicate_spaces(line);
 
 		if (t == LINE_TOPIC) {
 			topics_in_quiz.insert(line);

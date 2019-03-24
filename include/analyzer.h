@@ -31,10 +31,11 @@ enum MARK {
 struct Token
 {
 	enum WHAT {
-		UNDEF,
-		WORD,
-		SPACE,
-		PUNCT
+		UNDEF = 0x0,
+		WORD  = 0x1,
+		SPACE = 0x2,
+		PUNCT = 0x4,
+		DELIM = 0x8
 	};
 
 	WHAT what;

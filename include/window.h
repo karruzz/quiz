@@ -23,7 +23,7 @@ namespace view {
 
 namespace ncurses {
 
-typedef view::LANGUAGE LAN;
+typedef utils::LANGUAGE LAN;
 
 enum CLR_SCHEME {
 	BLUE = 1,
@@ -80,7 +80,6 @@ public:
 class CursorWindow : public Window
 {
 	Point cursor = { 0, 0 };
-	bool focused;
 
 	std::function<void()> resize_handle;
 
@@ -92,8 +91,7 @@ public:
 		: resize_handle(resize)
 	{}
 
-	void focus(bool enable, bool show_cursor = true) {
-		focused = enable;
+	void focus(bool focused, bool show_cursor = true) {
 		keypad(window, focused ? TRUE : FALSE);
 		if (!focused) return;
 
@@ -163,7 +161,10 @@ public:
 	virtual void refresh();
 
 	void update(const Problem& p) {
-		question = !p.inverted ? p.question :  p.solution;
+		if (p.not_show_question)
+			question.clear();
+		else
+			question = !p.inverted ? p.question :  p.solution;
 		refresh();
 	}
 };
@@ -177,13 +178,9 @@ class SolutionWindow : public Window
 public:
 	virtual void refresh();
 
-	void show(bool e) {
+	void visibility(bool e) {
 		visible = e;
 		refresh();
-	}
-
-	void show_analysed(const analysis::Verification& v) {
-		solution = v.solution;
 	}
 
 	void update(const Problem& p) {

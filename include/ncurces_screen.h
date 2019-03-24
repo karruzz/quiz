@@ -32,7 +32,7 @@ public:
 	virtual std::tuple<Screen::INPUT_STATE, std::list<std::string>> get_answer();
 	virtual int wait_pressed_key();
 
-	virtual void set_language(LANGUAGE layout);
+	virtual void set_language(utils::LANGUAGE layout);
 	virtual void update_statistic(const Statistic &s);
 	virtual void show_problem(const Problem& problem);
 	virtual void show_result(const analysis::Verification& v);
