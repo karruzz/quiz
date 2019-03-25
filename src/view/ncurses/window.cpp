@@ -40,7 +40,6 @@ void Window::clear()
 		whline(window, '-', geometry.w);
 	}
 	wmove(window, 0, 0);
-	wrefresh(window);
 }
 
 void Window::waddstr_colored(const std::string &s, int color_scheme, bool bold)
@@ -102,11 +101,11 @@ void QuestionWindow::refresh()
 void SolutionWindow::refresh()
 {
 	clear();
-	if (!visible) return;
-
-	int y = 0;
-	for (const std::string& s: solution)
-		mvwaddstr(window, y++, 0, s.c_str());
+	if (visible) {
+		int y = 0;
+		for (const std::string& s: solution)
+			mvwaddstr(window, y++, 0, s.c_str());
+	}
 
 	wrefresh(window);
 }
@@ -267,8 +266,7 @@ void AnswerWindow::key_process(int key)
 void AnswerWindow::prepare() {
 	mode = Mode::INPUT;
 	editor.reset(new Editor(tab_size));
-	update_cursor({ editor->get_screen_x(), editor->get_screen_y() });
-	update_window();
+	refresh();
 }
 
 void AnswerWindow::show_analysed(const analysis::Verification& v) {
