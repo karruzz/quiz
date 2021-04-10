@@ -198,9 +198,13 @@ void AnswerWindow::refresh()
 	wrefresh(window);
 }
 
+#define ctrl(x)  ((x) & 0x1f)
+
 void AnswerWindow::key_process(int key)
 {
 	switch (key) {
+		// some terminals have a problem with the backspace key - it is interpreted as Ctrl-H (0x08)
+		case ctrl('H'):
 		case KEY_BACKSPACE:
 			editor->backspace() ? update_window() : update_line();
 			break;
@@ -254,8 +258,9 @@ void AnswerWindow::key_process(int key)
 /* to log
 #ifdef DEBUG
 			std::stringstream ss;
-			ss << keyname(ch) << "; x: " << editor.get_screen_x() << "; y: " << editor.get_screen_y();
+			ss << keyname(key) << ": " << key << "; x: " << editor->get_screen_x() << "; y: " << editor->get_screen_y();
 			window_message->update(ss.str());
+			dbg_message(ss.str());
 #endif
 */
 	wmove(window, editor->get_screen_y(), editor->get_screen_x());

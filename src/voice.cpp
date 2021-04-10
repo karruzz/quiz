@@ -2,6 +2,8 @@
 #include <analyzer.h>
 #include <utils.h>
 #include <log.h>
+#include <thread>
+#include <functional>
 
 #ifdef AUDIO_CAPTURE
 #include <pocketsphinx/pocketsphinx.h>
@@ -10,8 +12,6 @@
 #include <sphinxbase/cmd_ln.h>
 #include <cstdio>
 #include <cstring>
-#include <thread>
-#include <functional>
 
 #define SIZE 32000
 

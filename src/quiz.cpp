@@ -52,6 +52,7 @@
 #define READ_QUESTION      "-w"
 
 // todo: voice refactor
+//       log debug to window_debug, which could be hidden
 
 const char * help_message =
 	"-h	show this help\n" \
