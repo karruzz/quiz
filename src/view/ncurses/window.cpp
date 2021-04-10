@@ -194,6 +194,7 @@ void AnswerWindow::update_line()
 void AnswerWindow::refresh()
 {
 	update_window();
+	update_cursor({ editor->get_screen_x(), editor->get_screen_y() });
 	wmove(window, editor->get_screen_y(), editor->get_screen_x());
 	wrefresh(window);
 }

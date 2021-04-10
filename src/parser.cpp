@@ -64,9 +64,9 @@ enum line_type {
 
 std::map<char, line_type> line_types = { LINE(SOLUTION), LINE(COMMENT), LINE(QUESTION), LINE(TOPIC), LINE(TAG), LINE(BLOCK) };
 
-line_type get_line_type(const std::string &line)
+line_type get_line_type(const std::string& line)
 {
-	if (line.empty())
+	if (line.empty() || line == "\r")
 		return LINE_EMPTY;
 
 	std::map<char, line_type>::iterator it = line_types.find(line.at(0));
