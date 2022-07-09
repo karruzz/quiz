@@ -3,5 +3,5 @@ bin/
 build/
 *.stat
 *.autosave
-CMakeLists.txt.user
+CMakeLists.txt.user*
 plan

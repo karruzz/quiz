@@ -101,7 +101,7 @@ void play_string(std::string s)
 		sprintf(audio_play_cmd, "spd-say \"%s\"", expanded.c_str());
 #elif defined GOOGLE_SPEECH
 		utils::LANGUAGE lan = utils::what_language(utils::to_utf16(s));
-		std::string l = "en";
+		std::string l = "nl";
 		if (lan == utils::LANGUAGE::RU)
 			l = "ru";
 		sprintf(audio_play_cmd, "google_speech -l %s \"%s\" > /dev/null 2>&1", l.c_str(), expanded.c_str());

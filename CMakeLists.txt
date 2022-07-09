@@ -53,11 +53,11 @@ if (audio)
 	)
 endif()
 
-if (spd-say)
-	target_compile_options(quiz PUBLIC -DSPD_SAY)
-elseif (google_speech)
+#if (spd-say)
+#	target_compile_options(quiz PUBLIC -DSPD_SAY)
+#elseif (google_speech)
 	target_compile_options(quiz PUBLIC -DGOOGLE_SPEECH)
-endif()
+#endif()
 
 
 # *********************** tests ************************

@@ -57,6 +57,7 @@
 const char * help_message =
 	"-h	show this help\n" \
 	"-p	play the solution\n" \
+	"-w	play the question\n" \
 	"-q	not show question\n" \
 	"-m	mixed mode, question and solution may be swapped\n" \
 	"-i	invert questions and solutions, discard mixed mode (-m)\n" \
@@ -67,8 +68,7 @@ const char * help_message =
 	"-t	use topics\n" \
 	"-c	case unsensitive\n" \
 	"-u	punctuation unsensitive\n"
-	"-z	total recall\n" \
-	"-w	read question but not show it\n";
+	"-z	total recall\n";
 
 namespace {
 
