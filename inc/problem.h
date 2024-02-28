@@ -12,6 +12,7 @@
 
 #include <string>
 #include <list>
+#include <utils.h>
 
 /* problem example:
  *
@@ -29,9 +30,8 @@
  */
 
 
-struct Problem {
-	std::list<std::string> question;
-	std::list<std::string> solution;
+class Problem {
+public:
 	size_t question_hash = 0;
 
 	int repeat = 1;
@@ -43,10 +43,15 @@ struct Problem {
 	bool inverted = false;
 	bool not_show_question = false;
 
-	Problem(const std::list<std::string> &q,
-		const std::list<std::string> &s)
-		: question(q)
-		, solution(s)
+	Problem(
+		const std::list<std::string> &q,
+		const std::list<std::string> &s,
+		utils::Language lang_question,
+		utils::Language lang_solution)
+		: _question(q)
+		, _solution(s)
+		, _lang_question(lang_question)
+		, _lang_solution(lang_solution)
 	{}
 
 	Problem() = default;
@@ -56,6 +61,22 @@ struct Problem {
 	bool operator< (const Problem &p) const {
 		return question_hash < p.question_hash;
 	}
+
+	const std::list<std::string>& question() const;
+	const std::list<std::string>& solution() const;
+
+	std::string question_str() const;
+	std::string solution_str() const;
+
+	utils::Language question_lang() const;
+	utils::Language solution_lang() const;
+
+private:
+	std::list<std::string> _question;
+	std::list<std::string> _solution;
+
+	utils::Language _lang_question;
+	utils::Language _lang_solution;
 };
 
 #endif // PROBLEM_H

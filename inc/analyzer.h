@@ -16,7 +16,9 @@
 #include <tuple>
 #include <vector>
 
-#include "problem.h"
+#include <problem.h>
+
+class Options;
 
 namespace analysis {
 
@@ -73,7 +75,7 @@ struct Verification
 
 	Verification(const Problem& p, const std::list<std::string>& a)
 		: answer(a)
-		, solution(!p.inverted ? p.solution : p.question)
+		, solution(p.solution())
 		, state(MARK::RIGHT)
 	{}
 
@@ -94,7 +96,7 @@ public:
 	};
 
 	Verification check(
-		const Problem& problem, const std::list<std::string>& answer, int flags);
+		const Problem& problem, const std::list<std::string>& answer, const Options& options);
 
 	static std::list<Token> split_to_tokens(const std::string& s);
 };

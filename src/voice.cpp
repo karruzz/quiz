@@ -79,7 +79,7 @@ std::string AudioRecord::capture()
 }
 
 static
-void play_string(std::string s)
+void play_string(std::string s, utils::Language lang)
 {
 	try {
 		if (s.empty()) return;
@@ -100,10 +100,25 @@ void play_string(std::string s)
 #ifdef SPD_SAY
 		sprintf(audio_play_cmd, "spd-say \"%s\"", expanded.c_str());
 #elif defined GOOGLE_SPEECH
-		utils::LANGUAGE lan = utils::what_language(utils::to_utf16(s));
-		std::string l = "nl";
-		if (lan == utils::LANGUAGE::RU)
-			l = "ru";
+		utils::Language lan = lang != utils::Language::UNKNOWN
+		                    ? lang
+		                    : utils::what_language(utils::to_utf16(s));
+
+		std::string l;
+		switch(lan)
+		{
+			case (utils::Language::RU) :
+				l = "ru";
+				break;
+			case (utils::Language::NL) :
+				l = "nl";
+				break;
+			case (utils::Language::EN) :
+			default:
+				l = "en";
+				break;
+		}
+
 		sprintf(audio_play_cmd, "google_speech -l %s \"%s\" > /dev/null 2>&1", l.c_str(), expanded.c_str());
 #endif
 		system(audio_play_cmd);
@@ -112,8 +127,8 @@ void play_string(std::string s)
 	}
 }
 
-void AudioRecord::play(const std::string& phrase)
+void AudioRecord::play(const std::string& phrase, utils::Language lang)
 {
-	std::thread t(std::bind(play_string, phrase));
+	std::thread t(std::bind(play_string, phrase, lang));
 	t.detach();
 }

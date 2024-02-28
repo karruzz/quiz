@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <analyzer.h>
+#include <options.h>
 #include <utils.h>
 
 namespace analysis {
@@ -70,7 +71,7 @@ std::list<Token> Analyzer::split_to_tokens(const std::string& s)
 }
 
 static
-Verification total_recall_check(Verification& v, int flags)
+Verification total_recall_check(Verification& v, bool case_unsensitive)
 {
 	std::set<std::string> recall_answ_set;
 	std::set<std::string> recall_solut_set;
@@ -94,13 +95,13 @@ Verification total_recall_check(Verification& v, int flags)
 	};
 
 
-	auto analyze_lines = [flags, remove_space, downcase, split_to_phrases]
+	auto analyze_lines = [case_unsensitive, remove_space, downcase, split_to_phrases]
 			(std::set<std::string>& set, const std::list<std::string> &lines)
 	{
 		for (auto line = lines.cbegin(); line != lines.cend(); ++line) {
 			std::list<Token> tokens = Analyzer::split_to_tokens(*line);
 
-			if (flags & Analyzer::OPTIONS::CASE_UNSENSITIVE)
+			if (case_unsensitive)
 				std::transform(tokens.begin(), tokens.end(), tokens.begin(), downcase);
 
 			split_to_phrases(set, tokens);
@@ -150,7 +151,7 @@ Verification total_recall_check(Verification& v, int flags)
 }
 
 Verification Analyzer::check(
-	const Problem& problem, const std::list<std::string>& answer, int flags)
+	const Problem& problem, const std::list<std::string>& answer, const Options& options)
 {
 	Verification v(problem, answer);
 	v.answer.remove("");
@@ -158,8 +159,8 @@ Verification Analyzer::check(
 	std::for_each(v.answer.begin(), v.answer.end(), utils::trim_spaces);
 	std::for_each(v.answer.begin(), v.answer.end(), utils::remove_duplicate_spaces);
 
-	if (flags & OPTIONS::TOTAL_RECALL)
-		return total_recall_check(v, flags);
+	if (options.get(Options::ANALYSIS_TOTAL_RECALL))
+		return total_recall_check(v, options.get(Options::ANALYSIS_CASE_UNSENSITIVE));
 
 	int line_num = 0;
 	auto answr_line = v.answer.cbegin();
@@ -174,13 +175,13 @@ Verification Analyzer::check(
 		answr_tokens.remove_if(remove_space);
 		solut_tokens.remove_if(remove_space);
 
-		if (flags & OPTIONS::CASE_UNSENSITIVE) {
+		if (options.get(Options::ANALYSIS_CASE_UNSENSITIVE)) {
 			auto downcase = [](Token& l) { utils::to_lower(l.str); return l; };
 			std::transform(answr_tokens.begin(), answr_tokens.end(), answr_tokens.begin(), downcase);
 			std::transform(solut_tokens.begin(), solut_tokens.end(), solut_tokens.begin(), downcase);
 		}
 
-		if (flags & OPTIONS::PUNCT_UNSENSITIVE) {
+		if (options.get(Options::ANALYSIS_PUNTCTUATION_UNSENSITIVE)) {
 			auto remove_punctuation = [](const Token& l){ return l.what & Token::PUNCT; };
 			answr_tokens.remove_if(remove_punctuation);
 			solut_tokens.remove_if(remove_punctuation);
@@ -246,7 +247,7 @@ Verification Analyzer::check(
 		}
 	}
 
-	if((flags & OPTIONS::TOTAL_RECALL) == 0 && v.solution.size() != v.answer.size())
+	if(options.get(Options::ANALYSIS_TOTAL_RECALL) && v.solution.size() != v.answer.size())
 		v.state |= MARK::INVALID_LINES_NUMBER;
 
 	return v;

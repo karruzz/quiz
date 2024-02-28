@@ -15,20 +15,22 @@
 
 namespace utils {
 
-enum class LANGUAGE {
+enum class Language {
 	UNKNOWN,
 	EN,
-	RU
+	RU,
+	NL
 };
 
 void trim_spaces(std::string& s);
 void remove_duplicate_spaces(std::string& s);
 void to_lower(std::u16string& s);
+std::vector<std::string> split(const std::string& s, const std::string& delimeter);
 
 // only Basic Multilingual Plane
 std::u16string to_utf16(const std::string& s);
 std::string to_utf8(const std::u16string& s);
-LANGUAGE what_language(const std::u16string& s);
+Language what_language(const std::u16string& s);
 
 } // namespace utils
 

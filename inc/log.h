@@ -25,15 +25,15 @@ public:
 	const std::string prefix;
 
 	Message() {
-		uncaught = std::uncaught_exception();
+		uncaught = std::uncaught_exceptions();
 	}
 
 	Message(const std::string& prefix_) : prefix(prefix_) {
-		uncaught = std::uncaught_exception();
+		uncaught = std::uncaught_exceptions();
 	}
 
 	~Message() {
-		if (uncaught >= std::uncaught_exception())
+		if (uncaught >= std::uncaught_exceptions())
 			std::cout << prefix << stream.str();
 	}
 

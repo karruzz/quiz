@@ -12,6 +12,8 @@
 #include <analyzer.h>
 #include <cstring>
 
+#define LIGHT_MODE 1
+
 namespace view {
 
 namespace ncurses {
@@ -21,8 +23,13 @@ namespace ncurses {
 void Window::create()
 {
 	window = newwin(geometry.h, geometry.w, geometry.y, geometry.x);
+#ifdef LIGHT_MODE
+	wattron(window, COLOR_PAIR(GRAY));
+	wbkgd(window, COLOR_PAIR(GRAY));
+#else
 	wattron(window, COLOR_PAIR(WHITE));
 	wbkgd(window, COLOR_PAIR(WHITE));
+#endif
 }
 
 void Window::remove()
@@ -69,14 +76,14 @@ void StatisticWindow::refresh()
 	clear();
 
 	wmove(window, 0, 1);
-	waddstr_colored("Left:[" + std::to_string(statistic.left_problems) + "];", GREEN);
-	waddstr_colored(" Solved:[" + std::to_string(statistic.solved_problems) + "];", CYAN);
-	waddstr_colored(" Errors:[" + std::to_string(statistic.errors) + "]", RED);
+	waddstr_colored("Left:[" + std::to_string(statistics.left_problems) + "];", GREEN);
+	waddstr_colored(" Solved:[" + std::to_string(statistics.solved_problems) + "];", CYAN);
+	waddstr_colored(" Errors:[" + std::to_string(statistics.errors) + "]", RED);
 
 	const std::string &problem = "PROBLEM:";
-	const std::string &repeat = " Repeat:[" + std::to_string(statistic.problem_repeat_times) + "];";
-	const std::string &errors = " Errors:[" + std::to_string(statistic.problem_errors) + "];";
-	const std::string &total_errors = " Total errors:[" + std::to_string(statistic.problem_total_errors) + "]";
+	const std::string &repeat = " Repeat:[" + std::to_string(statistics.problem_repeat_times) + "];";
+	const std::string &errors = " Errors:[" + std::to_string(statistics.problem_errors) + "];";
+	const std::string &total_errors = " Total errors:[" + std::to_string(statistics.problem_total_errors) + "]";
 	wmove(window, 0, geometry.w - (problem + repeat + errors + total_errors).size() - 1);
 
 	waddstr(window, problem.c_str());
@@ -145,7 +152,7 @@ void AnswerWindow::update_window()
 		for (const std::string& s: answer)
 			mvwaddstr(window, y++, 0, s.c_str());
 	} else if (mode == Mode::OUTPUT) {
-		static auto mvwaddstr_colored = [&](int y, int x, const std::string& str, int color, bool bold = false) {
+		static auto mvwaddstr_colored = [&](int y, int x, std::string str, int color, bool bold = false) {
 			wmove(window, y, x);
 			return waddstr_colored(str, color, bold);
 		};
@@ -156,12 +163,24 @@ void AnswerWindow::update_window()
 			if (errors_map_it != verification.errors.end()) {
 				std::vector<int> screen_x = expand_tabs(line, tab_size);
 				for (auto e: errors_map_it->second) {
-					if (e.what == analysis::Error::ERROR_TOKEN)
-						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), ERROR_WHITE, false);
-					if (e.what == analysis::Error::ERROR_SYMBOL)
-						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), ERROR_BLACK, true);
-					if (e.what == analysis::Error::MISSED || e.what == analysis::Error::REDUNDANT)
-						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), MISSED_BLACK, true);
+					if (e.what == analysis::Error::ERROR_TOKEN) {
+						//mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), ERROR_WHITE, false);
+						wmove(window, y, screen_x[e.pos]);
+						std::string str = utils::to_utf8(e.str);
+						return waddstr_colored(str, ERROR_WHITE, false);
+					}
+					if (e.what == analysis::Error::ERROR_SYMBOL) {
+//						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), ERROR_BLACK, true);
+						wmove(window, y, screen_x[e.pos]);
+						std::string str = utils::to_utf8(e.str);
+						return waddstr_colored(str, ERROR_BLACK, true);
+					}
+					if (e.what == analysis::Error::MISSED || e.what == analysis::Error::REDUNDANT) {
+//						mvwaddstr_colored(y, screen_x[e.pos], utils::to_utf8(e.str), MISSED_BLACK, true);
+						wmove(window, y, screen_x[e.pos]);
+						std::string str = utils::to_utf8(e.str);
+						return waddstr_colored(str, MISSED_BLACK, true);
+					}
 				}
 			}
 			++y;
@@ -169,16 +188,30 @@ void AnswerWindow::update_window()
 
 		++y;
 		if (verification.state == analysis::MARK::RIGHT) {
-			mvwaddstr_colored(y, 0, "[right]", SERVICE_COLOR);
+//			mvwaddstr_colored(y, 0, "[right]", SERVICE_COLOR);
+			wmove(window, y, 0);
+			return waddstr_colored("[right]", SERVICE_COLOR, false);
 		} else {
-			if ((verification.state & analysis::MARK::INVALID_LINES_NUMBER) != 0)
-				mvwaddstr_colored(y++, 0, "[invalid lines amount]", SERVICE_COLOR);
-			if ((verification.state & analysis::MARK::ERROR) != 0)
-				mvwaddstr_colored(y++, 0, "[invalid answer]", SERVICE_COLOR);
-			if ((verification.state & analysis::MARK::NOT_FULL_ANSWER) != 0)
-				mvwaddstr_colored(y++, 0, "[not full answer]", SERVICE_COLOR);
-			if ((verification.state & analysis::MARK::REDUNDANT_ANSWER) != 0)
-				mvwaddstr_colored(y++, 0, "[redundant answer]", SERVICE_COLOR);
+			if ((verification.state & analysis::MARK::INVALID_LINES_NUMBER) != 0) {
+//				mvwaddstr_colored(y++, 0, "[invalid lines amount]", SERVICE_COLOR);
+				wmove(window, y++, 0);
+				waddstr_colored("[invalid lines amount]", SERVICE_COLOR, false);
+			}
+			if ((verification.state & analysis::MARK::ERROR) != 0) {
+//				mvwaddstr_colored(y++, 0, "[invalid answer]", SERVICE_COLOR);
+				wmove(window, y++, 0);
+				waddstr_colored("[invalid answer]", SERVICE_COLOR, false);
+			}
+			if ((verification.state & analysis::MARK::NOT_FULL_ANSWER) != 0) {
+//				mvwaddstr_colored(y++, 0, "[not full answer]", SERVICE_COLOR);
+				wmove(window, y++, 0);
+				waddstr_colored("[not full answer]", SERVICE_COLOR, false);
+			}
+			if ((verification.state & analysis::MARK::REDUNDANT_ANSWER) != 0) {
+//				mvwaddstr_colored(y++, 0, "[redundant answer]", SERVICE_COLOR);
+				wmove(window, y++, 0);
+				waddstr_colored("[redundant answer]", SERVICE_COLOR, false);
+			}
 		}
 
 	}

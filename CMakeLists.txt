@@ -4,12 +4,15 @@ project(quiz CXX)
 
 add_compile_options(-Wall -std=c++17)
 
-if (debug)
-	add_compile_options(-g -O0 -DDEBUG)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("Debug build")
+    add_compile_options(-g -O0 -DDEBUG)
 endif()
 
+
 include_directories(
-	include
+	inc
+	inc/view
 )
 
 # ********************** shared ************************
@@ -22,7 +25,10 @@ add_executable(quiz "")
 target_sources(quiz
 	PRIVATE
 		src/log.cpp
+		src/main.cpp
+		src/options.cpp
 		src/parser.cpp
+		src/problem.cpp
 		src/quiz.cpp
 		src/voice.cpp
 		src/view/ncurses/editor.cpp
@@ -73,7 +79,7 @@ if (GTEST_DIR)
 	target_include_directories(analyze-test
 		PRIVATE
 			${GTEST_DIR}
-			${GTEST_DIR}/include
+			${GTEST_DIR}/inc
 	)
 
 	target_sources(analyze-test

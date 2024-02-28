@@ -14,19 +14,16 @@
 #include <set>
 #include <numeric>
 #include <functional>
-#include <experimental/filesystem>
+#include <filesystem>
 #include <cassert>
 
-#include "parser.h"
-#include "utils.h"
-#include "log.h"
-
-#define USE_TOPICS "-t"
-#define NUMBERS    "-n"
+#include <parser.h>
+#include <utils.h>
+#include <log.h>
 
 namespace {
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 // question file structs
 const char COMMENT   = '#';
@@ -36,6 +33,7 @@ const char TAG       = '^';  // deprecated
 const char QUESTION  = '>';
 const char SOLUTION  = '<';
 const char BLOCK     = '@'; // for repeated text blocks
+const char LANGUAGE  = '&';
 
 // statistic file structs
 const char STATISTIC   = '>';
@@ -57,12 +55,13 @@ enum line_type {
 	LINE_QUESTION,
 	LINE_TAG, // deprecated
 	LINE_TOPIC,
-	LINE_BLOCK
+	LINE_BLOCK,
+	LINE_LANGUAGE,
 };
 
 #define LINE(X) {X, LINE_##X}
 
-std::map<char, line_type> line_types = { LINE(SOLUTION), LINE(COMMENT), LINE(QUESTION), LINE(TOPIC), LINE(TAG), LINE(BLOCK) };
+std::map<char, line_type> line_types = { LINE(SOLUTION), LINE(COMMENT), LINE(QUESTION), LINE(TOPIC), LINE(TAG), LINE(BLOCK), LINE(LANGUAGE) };
 
 line_type get_line_type(const std::string& line)
 {
@@ -156,7 +155,7 @@ std::map<size_t, Statistic> load_statistic(const fs::path& quiz_path)
 
 } // namespace
 
-void Parser::save_statistic(const std::vector<Problem>& problems, const fs::path& path)
+void Parser::save_statistic(const std::vector<std::shared_ptr<Problem>>& problems, const fs::path& path)
 {
 	fs::path stat_path = "." + path.stem().string() + ".stat";
 	stat_path = path.parent_path() / stat_path;
@@ -169,11 +168,11 @@ void Parser::save_statistic(const std::vector<Problem>& problems, const fs::path
 
 	of << COMMENT <<  " > 2 0: total_errors - 2, last_errors - 0" << std::endl;
 	of << std::endl;
-	for (const Problem& p: problems) {
-		of << COMMENT << " " << p.question.front() << std::endl;
-		of << HASH << " " << p.question_hash << std::endl;
-		of << STATISTIC << " " << p.total_errors << " ";
-		of << (p.was_attempt ? p.errors : p.last_errors) << std::endl;
+	for (const auto p: problems) {
+		of << COMMENT << " " << p->question().front() << std::endl;
+		of << HASH << " " << p->question_hash << std::endl;
+		of << STATISTIC << " " << p->total_errors << " ";
+		of << (p->was_attempt ? p->errors : p->last_errors) << std::endl;
 		of << std::endl;
 	}
 
@@ -181,40 +180,33 @@ void Parser::save_statistic(const std::vector<Problem>& problems, const fs::path
 	of.close();
 }
 
-std::vector<Problem> Parser::load(
-		const fs::path& quiz_path,
-		const std::map<std::string, std::vector<std::string> >& params)
+std::vector<std::shared_ptr<Problem>> Parser::load(const Options& options)
 {
-	std::vector<Problem> problems;
+	std::vector<std::shared_ptr<Problem>> problems;
 	std::map<std::string, std::list<std::string>> repeat_blocks;
 
-	if (!fs::exists(quiz_path) || !fs::is_regular_file(quiz_path))
+	if (!fs::exists(options.filename()) || !fs::is_regular_file(options.filename()))
 		return problems;
 
-	std::ifstream quiz_ifstream(quiz_path.string());
+	std::ifstream quiz_ifstream(options.filename());
 	if (!quiz_ifstream.is_open())
 		return problems;
 
-	bool use_topics = params.find(USE_TOPICS) != params.end();
 	bool needed_topic = false;
 	std::set<std::string> topics;
-	if (use_topics) {
-		auto from_params = params.at(USE_TOPICS);
+	if (options.get(Options::USE_TOPICS)) {
+		auto from_params = options.args(Options::USE_TOPICS);
 		std::copy(from_params.begin(), from_params.end(), std::inserter(topics, topics.begin()));
 	}
 
-	bool definite_numbers = params.find(NUMBERS) != params.end();
 	parse_state prev_state = STATE_NONE, state = STATE_NONE;
 	std::string line;
 	std::list<std::string> quest, solut, block;
 	int question_number = -1, questions_loaded = 0;
-	int question_start = -1, question_max = -1, question_step = -1;
-	if (definite_numbers) {
-		question_start = std::stoi(params.at(NUMBERS).at(0));
-		question_max = std::stoi(params.at(NUMBERS).at(1));
-		question_step = std::stoi(params.at(NUMBERS).at(2));
-	}
+
 	std::set<std::string> topics_in_quiz;
+	utils::Language question_language = utils::Language::UNKNOWN;
+	utils::Language solution_language = utils::Language::UNKNOWN;
 	while (std::getline(quiz_ifstream, line)) {
 		prev_state = state;
 		line_type t = get_line_type(line);
@@ -229,7 +221,23 @@ std::vector<Problem> Parser::load(
 
 		if (t == LINE_TOPIC) {
 			topics_in_quiz.insert(line);
-			needed_topic = use_topics && topics.find(line) != topics.end();
+			needed_topic = options.get(Options::USE_TOPICS) && topics.find(line) != topics.end();
+			continue;
+		} else if (t == LINE_LANGUAGE) {
+			auto detectLanguage = [](const std::string& s) {
+				if (s == "ru")
+					return utils::Language::RU;
+				if (s == "en")
+					return utils::Language::EN;
+				if (s == "nl")
+					return utils::Language::NL;
+
+				return utils::Language::UNKNOWN;
+			};
+
+			auto langs = utils::split(line, " ");
+			question_language = detectLanguage(langs[0]);
+			solution_language = detectLanguage(langs[1]);
 			continue;
 		} else if (t == LINE_SOLUTION) {
 			state = STATE_SOLUTION_PREPARING;
@@ -252,28 +260,18 @@ std::vector<Problem> Parser::load(
 		if (state == STATE_BLOCK_PREPARING)
 			block.push_back(line);
 
-		if (use_topics && !needed_topic)
+		if (options.get(Options::USE_TOPICS) && !needed_topic)
 			continue;
 
 		// flush problem
 		if (state_changed && prev_state == STATE_SOLUTION_PREPARING) {
 			if (quest.size() > 0 && solut.size() > 0) {
 				++question_number;
-				if ((definite_numbers
-					 && question_number >= question_start
-					 && questions_loaded < question_max
-					 && (question_number - question_start) % question_step == 0)
-					|| (!definite_numbers))
-				{
-					problems.push_back(Problem(quest, solut));
-					questions_loaded++;
-				}
+				problems.push_back(std::make_shared<Problem>(quest, solut, question_language, solution_language));
+				questions_loaded++;
 
 				quest.clear();
 				solut.clear();
-
-				if (definite_numbers && questions_loaded >= question_max)
-					break;
 			}
 		}
 
@@ -293,34 +291,27 @@ std::vector<Problem> Parser::load(
 	}
 
 	if (quest.size() > 0 && solut.size() > 0) {
-		if ((definite_numbers
-			 && question_number >= question_start
-			 && questions_loaded < question_max
-			 && question_number % question_step == 0)
-			|| (!definite_numbers))
-		{
-			problems.push_back(Problem(quest, solut));
-		}
+		problems.push_back(std::make_shared<Problem>(quest, solut, question_language, solution_language));
 	}
 
 	quiz_ifstream.close();
 
-	for (Problem& p: problems) {
-		std::string s = std::accumulate(p.question.begin(), p.question.end(), std::string(""));
-		p.question_hash = std::hash<std::string>()(s);
+	for (std::shared_ptr<Problem> p: problems) {
+		std::string s = std::accumulate(p->question().begin(), p->question().end(), std::string(""));
+		p->question_hash = std::hash<std::string>()(s);
 	}
 
-	std::map<size_t, Statistic> stat = load_statistic(quiz_path);
+	std::map<size_t, Statistic> stat = load_statistic(options.filename());
 
-	for (Problem& p: problems) {
-		std::map<size_t, Statistic>::iterator mit = stat.find(p.question_hash);
+	for (std::shared_ptr<Problem> p: problems) {
+		std::map<size_t, Statistic>::iterator mit = stat.find(p->question_hash);
 		if (mit != stat.end()) {
-			p.total_errors = mit->second.total_errors;
-			p.last_errors = mit->second.last_errors;
+			p->total_errors = mit->second.total_errors;
+			p->last_errors = mit->second.last_errors;
 		}
 	}
 
-	if (use_topics)
+	if (options.get(Options::USE_TOPICS))
 		std::for_each(topics.cbegin(), topics.cend(), [&topics_in_quiz] (const std::string& s) {
 			bool any_lost_topics = false;
 			if (topics_in_quiz.find(s) == topics_in_quiz.end()) {

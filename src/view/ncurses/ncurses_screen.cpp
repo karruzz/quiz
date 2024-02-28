@@ -21,11 +21,13 @@
 
 #include <voice.h>
 #include <signal.h>
-#include <sys/ioctl.h>
+//#include <sys/ioctl.h>
 #include <functional>
 
 #include <mutex>
 #include <thread>
+
+#define LIGHT_MODE 1
 
 namespace view {
 
@@ -35,11 +37,15 @@ NScreen::NScreen(bool enter_accept_mode, int tab_size)
 	: enter_accept_mode(enter_accept_mode)
 {
 	enum CLR_CODE {
+		BLACK = 0,
+		DARK_GREEN = 2,
+		DARK_CYAN = 6,
 		LIGHT_RED = 1,
 		GRAY = 8,
 		RED = 9,
 		GREEN = 10,
-		YELLOW = 11,
+		//YELLOW = 11, // dark mode
+		YELLOW = 6, // light mode
 		BLUE = 12,
 		MAGENTA = 13,
 		CYAN = 14,
@@ -53,16 +59,33 @@ NScreen::NScreen(bool enter_accept_mode, int tab_size)
 	cbreak();
 	noecho();
 
+#ifdef LIGHT_MODE
+	int bkgr = CLR_CODE::LIGHT_WHITE;
+	int bkgr_error = CLR_CODE::RED;
+	int bkgr_missed = CLR_CODE::YELLOW;
+#else
 	int bkgr = CLR_CODE::GRAY;
 	int bkgr_error = CLR_CODE::LIGHT_RED;
 	int bkgr_missed = CLR_CODE::YELLOW;
+#endif
 
 	init_pair(CLR_SCHEME::WHITE, CLR_CODE::LIGHT_WHITE, bkgr);
+	init_pair(CLR_SCHEME::GRAY, CLR_CODE::BLACK, bkgr);
 
+#ifdef LIGHT_MODE
+	init_pair(CLR_SCHEME::CYAN, CLR_CODE::DARK_CYAN, bkgr);
+#else
 	init_pair(CLR_SCHEME::CYAN, CLR_CODE::CYAN, bkgr);
+#endif
+
 	init_pair(CLR_SCHEME::RED, CLR_CODE::RED, bkgr);
+#ifdef LIGHT_MODE
+	init_pair(CLR_SCHEME::GREEN, CLR_CODE::DARK_GREEN, bkgr);
+#else
 	init_pair(CLR_SCHEME::GREEN, CLR_CODE::GREEN, bkgr);
+#endif
 	init_pair(CLR_SCHEME::YELLOW, CLR_CODE::YELLOW, bkgr);
+
 	init_pair(CLR_SCHEME::BLUE, CLR_CODE::BLUE, bkgr);
 	init_pair(CLR_SCHEME::MAGENTA, CLR_CODE::MAGENTA, bkgr);
 
@@ -100,7 +123,7 @@ NScreen::~NScreen()
 	endwin();
 }
 
-void NScreen::update_statistic(const Statistic &s)
+void NScreen::update_statistic(const Statistics &s)
 {
 	window_statistic->update(s);
 }
@@ -116,7 +139,7 @@ void NScreen::show_problem(const Problem& problem)
 	window_message->update("F2 - check answer       F3 - skip question       F12 - exit ");
 }
 
-void NScreen::set_language(utils::LANGUAGE language)
+void NScreen::set_language(utils::Language language)
 {
 	window_message->set_lan(language);
 }
@@ -136,7 +159,7 @@ std::tuple<Screen::INPUT_STATE, std::list<std::string>> NScreen::get_answer()
 			window_answer->key_process(key);
 	}
 
-	window_message->set_lan(utils::LANGUAGE::UNKNOWN);
+	window_message->set_lan(utils::Language::UNKNOWN);
 }
 
 int NScreen::wait_pressed_key()

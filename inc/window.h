@@ -16,14 +16,13 @@
 #include <ncursesw/ncurses.h>
 
 #include <editor.h>
+#include <quiz.h>
 #include <voice.h>
 #include <viewer.h>
 
 namespace view {
 
 namespace ncurses {
-
-typedef utils::LANGUAGE LAN;
 
 enum CLR_SCHEME {
 	BLUE = 1,
@@ -33,6 +32,7 @@ enum CLR_SCHEME {
 	MAGENTA,
 	RED,
 	YELLOW,
+	GRAY,
 
 	ERROR_WHITE,
 	ERROR_BLACK,
@@ -141,13 +141,13 @@ public:
 
 class StatisticWindow : public Window
 {
-	Statistic statistic;
+	Statistics statistics;
 
 public:
 	virtual void refresh();
 
-	void update(Statistic s) {
-		statistic = s;
+	void update(Statistics s) {
+		statistics = s;
 		refresh();
 	}
 };
@@ -164,7 +164,7 @@ public:
 		if (p.not_show_question)
 			question.clear();
 		else
-			question = !p.inverted ? p.question :  p.solution;
+			question = p.question();
 		refresh();
 	}
 };
@@ -184,7 +184,7 @@ public:
 	}
 
 	void update(const Problem& p) {
-		solution = !p.inverted ? p.solution : p.question;
+		solution = p.solution();
 		refresh();
 	}
 };
@@ -194,18 +194,18 @@ class MessageWindow : public Window
 {
 	std::string message;
 
-	LAN language;
+	utils::Language language;
 
 	std::string lang_to_str() {
-		if (language == LAN::RU) return "RU";
-		if (language == LAN::EN) return "EN";
+		if (language == utils::Language::RU) return "RU";
+		if (language == utils::Language::EN) return "EN";
 		return std::string();
 	}
 
 public:
 	virtual void refresh();
 
-	void set_lan (LAN lan) {
+	void set_lan (utils::Language lan) {
 		language = lan;
 	}
 

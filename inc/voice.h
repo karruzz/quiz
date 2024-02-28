@@ -11,11 +11,12 @@
 #define RECORD_H
 
 #include <string>
+#include <utils.h>
 
 class AudioRecord {
 public:
 	static std::string capture();
-	static void play(const std::string& phrase);
+	static void play(const std::string& phrase, utils::Language lang = utils::Language::UNKNOWN);
 };
 
 #endif // RECORD_H

@@ -82,20 +82,20 @@ std::string to_utf8(const std::u16string& in)
 	return out;
 }
 
-LANGUAGE what_language(const std::u16string& s) {
-	std::map<LANGUAGE, int> langs ;
+Language what_language(const std::u16string& s) {
+	std::map<Language, int> langs ;
 	for (char16_t c: s) {
 		if (c >= 0x0410 && c < 0x044F) {
-			langs[LANGUAGE::RU]++;
+			langs[Language::RU]++;
 		} else if (c >= 0x0041 && c < 0x007a) {
-			langs[LANGUAGE::EN]++;
+			langs[Language::EN]++;
 		} else {
-			langs[LANGUAGE::UNKNOWN]++;
+			langs[Language::UNKNOWN]++;
 		}
 	}
 
 	int max = 0;
-	LANGUAGE result = LANGUAGE::UNKNOWN;
+	Language result = Language::UNKNOWN;
 	for (auto p: langs) {
 		if (p.second > max) {
 			max = p.second;
@@ -105,5 +105,32 @@ LANGUAGE what_language(const std::u16string& s) {
 
 	return result;
 }
+
+std::vector<std::string> split(const std::string& line, const std::string& delimeter)
+{
+	using S = std::string;
+	auto gettoken = [](const S& s, size_t& begin, S& token, const S& delimeter) -> bool
+	{
+		size_t end = s.size();
+		if (begin >= end) return false;
+
+		size_t pos = s.find(delimeter, begin);
+		if (pos != S::npos)
+			end = pos;
+
+		token = s.substr(begin, end - begin);
+		begin = end + delimeter.size();
+		return true;
+	};
+
+	size_t pos = 0;
+	std::string token;
+	std::vector<std::string> tokens;
+	while(gettoken(line, pos, token, delimeter))
+		tokens.push_back(token);
+
+	return tokens;
+}
+
 
 } // namespace utils
